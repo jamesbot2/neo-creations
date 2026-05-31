@@ -1,5 +1,6 @@
 // ===== SUBWAY SURFER CLONE - Three.js =====
 // Full game implementation - no external assets needed
+// FIXED: memory leak, player height, jump physics, main menu, pause, quit, cyan screen
 
 (function() {
     'use strict';
@@ -14,9 +15,9 @@
     const TRACK_SEGMENT_LENGTH = 24;
     const SPAWN_AHEAD = 140;
     const DESPAWN_BEHIND = 30;
-    const GRAVITY = -0.45;
-    const JUMP_VELOCITY = 0.55;
-    const PLAYER_Y = 0.8;
+    const GRAVITY = -0.012;
+    const JUMP_VELOCITY = 0.25;
+    const PLAYER_Y = 0;
     const ROLL_HEIGHT = 0.35;
     const COIN_RADIUS = 0.35;
     const GROUND_WIDTH = LANE_WIDTH * LANE_COUNT + 1;
@@ -49,7 +50,9 @@
         gameTime: 0,
         scoreTimer: 0,
         instructionTimer: 8,
-        hasStartedTouch: false
+        hasStartedTouch: false,
+        started: false,
+        paused: false
     };
 
     // ========== THREE.JS SETUP ==========
@@ -61,6 +64,7 @@
 
     // UI Elements
     let scoreEl, coinsEl, gameOverEl, finalScoreEl, finalCoinsEl, restartBtnEl, instructionsEl, speedEl;
+    let menuOverlay, pauseOverlay, pauseBtnEl;
     let uiOverlay;
 
     // ========== TEXTURE GENERATION ==========
@@ -337,11 +341,32 @@
         return texture;
     }
 
+    // ========== DISPOSE HELPER ==========
+    function disposeObject(obj) {
+        if (!obj) return;
+        if (obj.geometry) {
+            obj.geometry.dispose();
+        }
+        if (obj.material) {
+            if (obj.material.map) {
+                obj.material.map.dispose();
+            }
+            obj.material.dispose();
+        }
+        if (obj.children) {
+            // Clone the children array since we may be modifying it
+            const children = Array.from(obj.children);
+            for (let i = 0; i < children.length; i++) {
+                disposeObject(children[i]);
+            }
+        }
+    }
+
     // ========== SCENE SETUP ==========
     function initScene() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 80, 200);
+        scene.fog = new THREE.Fog(0x87CEEB, 60, 150);
 
         camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
         camera.position.set(0, 6, 8);
@@ -388,9 +413,11 @@
     function onResize() {
         const w = window.innerWidth;
         const h = window.innerHeight;
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
+        if (camera && renderer) {
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        }
     }
 
     // ========== PLAYER ==========
@@ -893,6 +920,7 @@
         // Remove old buildings beyond despawn range
         for (let i = state.buildings.length - 1; i >= 0; i--) {
             if (state.buildings[i].position.z > DESPAWN_BEHIND) {
+                disposeObject(state.buildings[i]);
                 scene.remove(state.buildings[i]);
                 state.buildings.splice(i, 1);
             }
@@ -917,9 +945,10 @@
     }
 
     function spawnObstacles() {
-        // Remove old obstacles
+        // Remove old obstacles - dispose geometries before removal
         for (let i = state.obstacles.length - 1; i >= 0; i--) {
             if (state.obstacles[i].position.z > DESPAWN_BEHIND) {
+                disposeObject(state.obstacles[i]);
                 scene.remove(state.obstacles[i]);
                 state.obstacles.splice(i, 1);
             }
@@ -992,12 +1021,72 @@
         uiOverlay = document.createElement('div');
         uiOverlay.id = 'ui-overlay';
 
+        // ===== MAIN MENU OVERLAY =====
+        menuOverlay = document.createElement('div');
+        menuOverlay.id = 'menu-overlay';
+        menuOverlay.className = 'overlay';
+
+        const menuContent = document.createElement('div');
+        menuContent.className = 'menu-content';
+
+        const title = document.createElement('h1');
+        title.className = 'menu-title';
+        title.textContent = 'SUBWAY SURFER';
+
+        const tapToStart = document.createElement('div');
+        tapToStart.className = 'tap-to-start';
+        tapToStart.textContent = 'TAP TO START';
+
+        const controls = document.createElement('div');
+        controls.className = 'menu-controls';
+        controls.innerHTML = '← → Move &nbsp;|&nbsp; ↑ Jump &nbsp;|&nbsp; ↓ Roll';
+
+        const mobileHint = document.createElement('div');
+        mobileHint.className = 'menu-mobile-hint';
+        mobileHint.textContent = 'Swipe to play on mobile';
+
+        menuContent.appendChild(title);
+        menuContent.appendChild(tapToStart);
+        menuContent.appendChild(controls);
+        menuContent.appendChild(mobileHint);
+        menuOverlay.appendChild(menuContent);
+        uiOverlay.appendChild(menuOverlay);
+
+        // ===== PAUSE OVERLAY =====
+        pauseOverlay = document.createElement('div');
+        pauseOverlay.id = 'pause-overlay';
+        pauseOverlay.className = 'overlay';
+        pauseOverlay.style.display = 'none';
+
+        const pauseContent = document.createElement('div');
+        pauseContent.className = 'menu-content';
+
+        const pauseTitle = document.createElement('h1');
+        pauseTitle.className = 'menu-title';
+        pauseTitle.textContent = 'PAUSED';
+
+        const tapToContinue = document.createElement('div');
+        tapToContinue.className = 'tap-to-start';
+        tapToContinue.textContent = 'TAP TO CONTINUE';
+
+        pauseContent.appendChild(pauseTitle);
+        pauseContent.appendChild(tapToContinue);
+        pauseOverlay.appendChild(pauseContent);
+        uiOverlay.appendChild(pauseOverlay);
+
+        // ===== PAUSE BUTTON (corner) =====
+        pauseBtnEl = document.createElement('div');
+        pauseBtnEl.id = 'pause-btn';
+        pauseBtnEl.textContent = '\u23F8';
+        pauseBtnEl.style.display = 'none';
+        uiOverlay.appendChild(pauseBtnEl);
+
         // Score display
         const scoreDiv = document.createElement('div');
         scoreDiv.id = 'score-display';
         const coinsSpan = document.createElement('span');
         coinsSpan.className = 'coins-label';
-        coinsSpan.textContent = '🪙 ';
+        coinsSpan.textContent = '\uD83E\uDE99 ';
         const coinCount = document.createElement('span');
         coinCount.id = 'coin-count';
         coinCount.textContent = '0';
@@ -1005,7 +1094,7 @@
         const sep = document.createTextNode('  |  ');
         const distSpan = document.createElement('span');
         distSpan.className = 'dist-label';
-        distSpan.textContent = '🏃 ';
+        distSpan.textContent = '\uD83C\uDFC3 ';
         const distCount = document.createElement('span');
         distCount.id = 'distance-count';
         distCount.textContent = '0';
@@ -1025,7 +1114,7 @@
         speedDiv.textContent = 'SPD: 1x';
         uiOverlay.appendChild(speedDiv);
 
-        // Game over screen - build with DOM to avoid getElementById issues
+        // Game over screen
         const gameOverDiv = document.createElement('div');
         gameOverDiv.id = 'game-over-screen';
         
@@ -1057,6 +1146,13 @@
         restartBtn.id = 'restart-btn';
         restartBtn.textContent = 'TAP TO RETRY';
         gameOverDiv.appendChild(restartBtn);
+
+        // Quit button
+        const quitBtn = document.createElement('div');
+        quitBtn.className = 'quit-btn';
+        quitBtn.id = 'quit-btn';
+        quitBtn.textContent = 'QUIT';
+        gameOverDiv.appendChild(quitBtn);
         
         uiOverlay.appendChild(gameOverDiv);
         gameOverEl = gameOverDiv;
@@ -1064,23 +1160,101 @@
         finalCoinsEl = finalCoinSpan;
         restartBtnEl = restartBtn;
 
-        // Instructions
+        // Instructions (in-game hint)
         const instrDiv = document.createElement('div');
         instrDiv.id = 'instructions';
         instrDiv.innerHTML = `
-            <span class="key">←</span> <span class="key">→</span> Move &nbsp;|&nbsp;
-            <span class="key">↑</span> Jump &nbsp;|&nbsp;
-            <span class="key">↓</span> Roll<br>
-            Swipe on mobile
+            <span class="key">\u2190</span> <span class="key">\u2192</span> Move &nbsp;|&nbsp;
+            <span class="key">\u2191</span> Jump &nbsp;|&nbsp;
+            <span class="key">\u2193</span> Roll<br>
+            Swipe on mobile &nbsp;|&nbsp; <span class="key">Esc/P</span> Pause
         `;
         uiOverlay.appendChild(instrDiv);
         instructionsEl = instrDiv;
 
         document.body.appendChild(uiOverlay);
 
-        // Restart button - now it's in the DOM
+        // Event listeners
         restartBtnEl.addEventListener('click', restartGame);
         restartBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); restartGame(); });
+
+        const quitBtnEl = document.getElementById('quit-btn');
+        if (quitBtnEl) {
+            quitBtnEl.addEventListener('click', quitToMenu);
+            quitBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); quitToMenu(); });
+        }
+
+        // Menu click/tap to start
+        menuOverlay.addEventListener('click', startGameFromMenu);
+        menuOverlay.addEventListener('touchend', (e) => { e.preventDefault(); startGameFromMenu(); });
+
+        // Pause button
+        pauseBtnEl.addEventListener('click', togglePause);
+        pauseBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); togglePause(); });
+
+        // Pause overlay click to resume
+        pauseOverlay.addEventListener('click', togglePause);
+        pauseOverlay.addEventListener('touchend', (e) => { e.preventDefault(); togglePause(); });
+    }
+
+    function startGameFromMenu() {
+        if (state.started) return;
+        state.started = true;
+        menuOverlay.style.display = 'none';
+        pauseBtnEl.style.display = 'block';
+        if (!audioCtx) initAudio();
+        // Ensure the game loop starts from a clean delta
+        clock.getDelta();
+    }
+
+    function togglePause() {
+        if (!state.started || state.gameOver) return;
+        state.paused = !state.paused;
+        if (state.paused) {
+            pauseOverlay.style.display = 'flex';
+            pauseBtnEl.textContent = '\u25B6'; // play
+            clock.getDelta(); // clear accumulated delta
+        } else {
+            pauseOverlay.style.display = 'none';
+            pauseBtnEl.textContent = '\u23F8'; // pause
+            clock.getDelta(); // clear accumulated delta
+        }
+    }
+
+    function quitToMenu() {
+        // Full reset
+        resetAllGameObjects();
+        resetState();
+        gameOverEl.classList.remove('visible');
+        pauseOverlay.style.display = 'none';
+        pauseBtnEl.style.display = 'none';
+        menuOverlay.style.display = 'flex';
+        state.started = false;
+        state.paused = false;
+    }
+
+    function resetAllGameObjects() {
+        // Dispose and remove all dynamic objects
+        for (const obj of state.trackSegments) {
+            disposeObject(obj);
+            scene.remove(obj);
+        }
+        for (const obj of state.obstacles) {
+            disposeObject(obj);
+            scene.remove(obj);
+        }
+        for (const obj of state.coinObjects) {
+            disposeObject(obj);
+            scene.remove(obj);
+        }
+        for (const obj of state.buildings) {
+            disposeObject(obj);
+            scene.remove(obj);
+        }
+        for (const obj of state.particles) {
+            disposeObject(obj);
+            scene.remove(obj);
+        }
     }
 
     // ========== CONTROLS ==========
@@ -1089,7 +1263,17 @@
     function setupControls() {
         // Keyboard
         document.addEventListener('keydown', (e) => {
-            keys[e.key] = true;
+            keys[e.key] = e.key;
+
+            // Handle Escape/P for pause regardless of game state
+            if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+                if (state.started && !state.gameOver) {
+                    togglePause();
+                    // Don't let the escape trigger anything else
+                    return;
+                }
+            }
+
             handleKeyInput(e.key);
         });
         document.addEventListener('keyup', (e) => {
@@ -1146,6 +1330,11 @@
 
             e.preventDefault();
         }, { passive: false });
+
+        // Prevent default touch actions on the canvas (scrolling, zooming)
+        document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+        document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
+        document.addEventListener('gestureend', function(e) { e.preventDefault(); });
     }
 
     function handleKeyInput(key) {
@@ -1222,12 +1411,15 @@
         const playerPos = player.position;
         const playerLane = state.currentLane;
         const playerX = LANE_POSITIONS[playerLane];
+        // Adjust player height for collision: group y + leg bottom (0.2 - 0.15) = 0.05 if group y = 0
+        // Player hitbox center y: when not jumping, group y + 0.5 (half of body height approx)
+        const effectivePlayerY = playerPos.y + 0.5;
         const playerHitbox = {
             x: playerX,
-            y: state.isRolling ? ROLL_HEIGHT / 2 : state.isJumping ? PLAYER_Y : PLAYER_Y,
+            y: effectivePlayerY,
             z: playerPos.z,
             w: 0.5,
-            h: state.isRolling ? ROLL_HEIGHT * 0.8 : 1.4,
+            h: state.isRolling ? 0.5 : 1.0,
             d: 0.4
         };
 
@@ -1267,15 +1459,7 @@
     }
 
     // ========== GAME FLOW ==========
-    function restartGame() {
-        // Remove all dynamic objects
-        for (const obj of state.trackSegments) scene.remove(obj);
-        for (const obj of state.obstacles) scene.remove(obj);
-        for (const obj of state.coinObjects) scene.remove(obj);
-        for (const obj of state.buildings) scene.remove(obj);
-        for (const obj of state.particles) scene.remove(obj);
-
-        // Reset state
+    function resetState() {
         state.score = 0;
         state.coins = 0;
         state.speed = START_SPEED;
@@ -1300,26 +1484,41 @@
         state.buildings = [];
         state.particles = [];
         state.hasStartedTouch = false;
+        state.running = true;
 
         // Reset player
-        player.position.set(0, 0, 0);
-        player.rotation.set(0, 0, 0);
-        player.scale.set(1, 1, 1);
+        if (player) {
+            player.position.set(0, 0, 0);
+            player.rotation.set(0, 0, 0);
+            player.scale.set(1, 1, 1);
+        }
 
         // Reset camera
-        camera.position.set(0, 6, 8);
-        camera.lookAt(0, 0, -10);
+        if (camera) {
+            camera.position.set(0, 6, 8);
+            camera.lookAt(0, 0, -10);
+        }
+    }
+
+    function restartGame() {
+        resetAllGameObjects();
+        resetState();
 
         // Hide game over
         gameOverEl.classList.remove('visible');
 
-        // Clear obstacles map
-        state.coinObstacleMap = new Map();
+        // Ensure paused is false
+        state.paused = false;
+        pauseOverlay.style.display = 'none';
+        pauseBtnEl.textContent = '\u23F8';
+        pauseBtnEl.style.display = 'block';
 
         // Spawn fresh
         spawnInitialTrack();
         spawnBuildings();
         spawnObstacles();
+
+        clock.getDelta(); // clear any accumulated time
     }
 
     function gameOver() {
@@ -1339,6 +1538,9 @@
         finalScoreEl.textContent = Math.floor(state.score);
         finalCoinsEl.textContent = state.coins;
         gameOverEl.classList.add('visible');
+
+        // Hide pause button
+        pauseBtnEl.style.display = 'none';
     }
 
     // ========== UPDATE LOOP ==========
@@ -1351,6 +1553,18 @@
             }
             updateCamera();
             renderer.render(scene, camera);
+            return;
+        }
+
+        // Still render the scene even when paused or not started, but skip game logic
+        if (!state.started || state.paused) {
+            // Still animate the scene a bit for visual appeal
+            if (camera) {
+                updateCamera();
+            }
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
             return;
         }
 
@@ -1397,7 +1611,7 @@
             seg.position.z += state.speed;
         }
 
-        // Recycle track segments
+        // Recycle track segments - proper math
         for (let i = state.trackSegments.length - 1; i >= 0; i--) {
             if (state.trackSegments[i].position.z > TRACK_SEGMENT_LENGTH) {
                 state.trackSegments[i].position.z -= TRACK_SEGMENT_LENGTH * state.trackSegments.length;
@@ -1415,11 +1629,11 @@
             // Spin
             coin.rotation.y += delta * 3;
             // Bob
-            const children = coin.children;
-            if (children.length > 0) {
-                children[0].position.y = 0.6 + Math.sin(state.gameTime * 2 + coin.id) * 0.1;
-                if (children[1] && children[1].type === 'RingGeometry') {
-                    children[1].position.y = 0.6 + Math.sin(state.gameTime * 2 + coin.id) * 0.1;
+            if (coin.children.length > 0) {
+                const bobY = 0.6 + Math.sin(state.gameTime * 2 + coin.position.z * 0.5) * 0.1;
+                coin.children[0].position.y = bobY;
+                if (coin.children.length > 1) {
+                    coin.children[1].position.y = bobY;
                 }
             }
         }
@@ -1429,7 +1643,7 @@
             b.position.z += state.speed;
         }
 
-        // Move particles
+        // Move particles and clean up dead ones
         for (let i = state.particles.length - 1; i >= 0; i--) {
             const p = state.particles[i];
             const ud = p.userData;
@@ -1441,6 +1655,7 @@
             p.material.opacity = Math.max(0, ud.life);
             p.scale.setScalar(ud.life);
             if (ud.life <= 0) {
+                disposeObject(p);
                 scene.remove(p);
                 state.particles.splice(i, 1);
             }
@@ -1455,10 +1670,16 @@
             player.position.x = startX + (targetX - startX) * easeOutQuad(state.laneLerp);
         }
 
+        // Track actual player x for lane
+        const currentLaneX = LANE_POSITIONS[state.currentLane];
+        if (state.laneLerp >= 1) {
+            player.position.x = currentLaneX;
+        }
+
         // Jump physics
         if (state.isJumping) {
             state.playerHeight += state.jumpVelocity;
-            state.jumpVelocity += GRAVITY * delta * 60;
+            state.jumpVelocity += GRAVITY;
             if (state.playerHeight <= PLAYER_Y) {
                 state.playerHeight = PLAYER_Y;
                 state.isJumping = false;
@@ -1491,7 +1712,7 @@
             player.scale.y += (1 - player.scale.y) * 0.15;
         }
 
-        // Running animation
+        // Running animation - bob
         const runCycle = state.gameTime * 8;
         if (!state.isJumping) {
             const bobAmount = 0.04;
@@ -1529,12 +1750,14 @@
                 createCoinParticles(coin.position.clone());
                 state.coins++;
                 playCoinSound();
+                disposeObject(coin);
                 scene.remove(coin);
                 state.coinObjects.splice(i, 1);
             }
 
-            // Remove if too far behind
+            // Remove if too far behind - dispose first
             if (coin.position.z > DESPAWN_BEHIND) {
+                disposeObject(coin);
                 scene.remove(coin);
                 state.coinObjects.splice(i, 1);
             }
@@ -1561,8 +1784,12 @@
     }
 
     function updateCamera() {
+        if (!player || !camera) return;
+
+        const playerX = player.position.x;
+
         const targetCameraPos = {
-            x: player.position.x * 0.4,
+            x: playerX * 0.4,
             y: state.isRolling ? 5.5 : 6,
             z: player.position.z + 8
         };
@@ -1580,7 +1807,7 @@
         camera.position.z += (targetCameraPos.z + shakeOffset.z - camera.position.z) * 0.08;
 
         const targetLook = new THREE.Vector3(
-            player.position.x * 0.3,
+            playerX * 0.3,
             0.5,
             player.position.z - 8
         );
@@ -1591,35 +1818,18 @@
     function animate() {
         try {
             update();
-            if (renderer && scene && camera) {
-                renderer.render(scene, camera);
-            }
-        } catch(e) {}
-    }
-    
-    // Use setInterval as fallback for headless environments
-    let animInterval = null;
-    function startAnimationLoop() {
-        if (animInterval) clearInterval(animInterval);
-        animInterval = setInterval(animate, 1000/30);
-    }
-    
-    // Keep RAF for normal browsers, but switch to interval if RAF doesn't fire
-    function animateWithRAF() {
-        rafActive = true;
-        requestAnimationFrame(animateWithRAF);
-        animate();
-    }
-    
-    // RAF timeout fallback: if no animation happens in 2 seconds, switch to interval
-    let rafActive = false;
-    function rafFallback() {
-        if (!rafActive) {
-            console.log('RAF fallback: switching to setInterval');
-            startAnimationLoop();
+        } catch(e) {
+            console.error('Animation error:', e);
         }
     }
-    setTimeout(rafFallback, 2000);
+    
+    function startAnimationLoop() {
+        function rafCallback() {
+            requestAnimationFrame(rafCallback);
+            animate();
+        }
+        rafCallback();
+    }
 
     // ========== INIT ==========
     function init() {
@@ -1639,9 +1849,14 @@
         if (scoreEl) scoreEl.textContent = '0';
         if (coinsEl) coinsEl.textContent = '0';
 
-        animateWithRAF();
+        // Show menu
+        menuOverlay.style.display = 'flex';
+        state.started = false;
+
+        startAnimationLoop();
+        
         // Expose for headless testing
-        window.__neoGame = { state, animate, update, restartGame, renderer, scene, camera };
+        window.__neoGame = { state, animate, update, restartGame, renderer, scene, camera, togglePause, quitToMenu };
     }
 
     // Start when DOM ready
