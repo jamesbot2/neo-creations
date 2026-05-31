@@ -643,7 +643,9 @@
         if (state.obstacles.length === 0) {
             // Initial: scatter one per lane with big gaps
             // Pattern: each obstacle blocks 1 lane, player dodges to other 2
-            const positions = [-30, -45, -60, -75, -90, -105, -120, -135, -150, -165, -180, -195, -210, -225, -240];
+            const positions = [];
+            // Pre-load obstacles from z=-30 to z=-330 with 15-unit spacing
+            for (let z = -30; z > -330; z -= 15) positions.push(z);
             // Every 3rd obstacle is a double (blocks 2 lanes)
             for (let i = 0; i < positions.length; i++) {
                 const z = positions[i];
@@ -683,17 +685,16 @@
             return;
         }
 
-        // Find the farthest-ahead obstacle (most negative z)
-        let farthestZ = 0;
-        for (const o of state.obstacles) {
-            if (o.position.z < farthestZ) farthestZ = o.position.z;
-        }
-        // Spawn one new obstacle when the farthest has moved close (past -20)
-        // Speed-dependent spawn: more warning at higher speeds
-        const spawnTrigger = -(15 + state.speed * 30);
-        if (farthestZ > spawnTrigger) {
-            const z = -(25 + state.speed * 16) - Math.random() * 15;
-            // Occasionally spawn a double obstacle
+        // Fill the pipe: keep enough obstacles ahead of the player
+        // Count obstacles in the visible & near-visible range
+        const ahead = state.obstacles.filter(o => o.position.z > -90 && o.position.z < 0);
+        
+        // Always keep at least 6 obstacles approaching
+        if (ahead.length < 6) {
+            // Spawn one at the far edge of visible range
+            const z = -55 - Math.random() * 25;
+            
+            // Occasionally spawn a double obstacle (15%)
             if (Math.random() < 0.15) {
                 const openLane = Math.floor(Math.random() * 3);
                 for (const lane of [0,1,2].filter(l => l !== openLane)) {
@@ -706,10 +707,10 @@
                     spawnCoinsNearObstacle(obs, lane, z);
                 }
             } else {
-                // Check which lanes are blocked near the spawn area
+                // Pick a lane that's not crowded
                 const busy = new Set();
-                for (const o of state.obstacles) {
-                    if (o.position.z > -40 && o.position.z < 10) {
+                for (const o of ahead) {
+                    if (o.position.z > z - 10) {
                         const l = Math.round((o.position.x + LANE_WIDTH) / LANE_WIDTH);
                         if (l >= 0 && l <= 2) busy.add(l);
                     }
@@ -727,7 +728,7 @@
                 state.coinObstacleMap.set(obs.uuid, []);
                 spawnCoinsNearObstacle(obs, lane, z);
             }
-    }
+        }
     }
 
     function spawnCoinsNearObstacle(obstacle, lane, z) {
