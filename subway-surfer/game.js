@@ -1508,20 +1508,29 @@
             player.position.x = LANE_POSITIONS[state.currentLane];
         }
 
-        // Jump physics
+        // Jump physics - roll in air = fall faster
         if (state.isJumping) {
             state.playerHeight += state.jumpVelocity;
-            state.jumpVelocity += GRAVITY * delta * 60;
+            const gravMult = state.isRolling ? 2.5 : 1.0;
+            state.jumpVelocity += GRAVITY * gravMult * delta * 60;
             if (state.playerHeight <= PLAYER_Y) {
                 state.playerHeight = PLAYER_Y;
                 state.isJumping = false;
                 state.jumpVelocity = 0;
+                // Landing while rolling: keep sliding
+                if (state.isRolling) {
+                    setTimeout(() => {
+                        if (state.isRolling && !state.isJumping) {
+                            state.isRolling = false;
+                            state.targetPlayerHeight = PLAYER_Y;
+                        }
+                    }, 400);
+                }
             }
         }
 
         // Roll height - tuck in air, slide on ground
         if (state.isRolling && !state.isJumping) {
-            // On ground: apply squash
             state.playerHeight += (state.targetPlayerHeight - state.playerHeight) * 0.2;
             if (Math.abs(state.playerHeight - state.targetPlayerHeight) < 0.01) {
                 state.playerHeight = state.targetPlayerHeight;
