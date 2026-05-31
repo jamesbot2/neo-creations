@@ -56,7 +56,8 @@
         bestScore: parseInt(localStorage.getItem('subwayBest') || '0'),
         onRoof: false,
         rollEndTime: 0,
-        firstPerson: false
+        firstPerson: false,
+        difficulty: 2
     };
 
     // ========== THREE.JS SETUP ==========
@@ -647,8 +648,10 @@
             // Initial: scatter one per lane with big gaps
             // Pattern: each obstacle blocks 1 lane, player dodges to other 2
             const positions = [];
-            // Pre-load obstacles from z=-30 to z=-330 with 15-unit spacing
-            for (let z = -30; z > -330; z -= 15) positions.push(z);
+            // Difficulty-based initial spacing: easy=wide, medium=medium, hard=tight
+            const initGap = [30, 20, 15][state.difficulty] || 15;
+            const initCount = [10, 15, 20][state.difficulty] || 20;
+            for (let z = -30; z > -initGap * initCount; z -= initGap) positions.push(z);
             // Occasionally spawn double obstacles, but not too often
             for (let i = 0; i < positions.length; i++) {
                 const z = positions[i];
@@ -698,9 +701,10 @@
         // Fill the pipe: keep enough obstacles ahead of the player
         const ahead = state.obstacles.filter(o => o.position.z > -90 && o.position.z < 0);
 
-        // Speed-dependent pipe: more obstacles at higher speeds
-        const targetCount = Math.min(6 + Math.floor(state.speed * 6), 18);
-        const spawnZ = -(45 + state.speed * 30) - Math.random() * 15;
+        // Difficulty-based pipe: easy=fewer, hard=more
+        const diffMult = [0.4, 0.7, 1.0][state.difficulty] || 1.0;
+        const targetCount = Math.min(Math.floor((6 + state.speed * 6) * diffMult), Math.floor(18 * diffMult));
+        const spawnZ = -(45 + state.speed * 30 * diffMult) - Math.random() * 15 * diffMult;
 
         if (ahead.length < targetCount) {
             const z = spawnZ;
@@ -805,12 +809,17 @@
                 <h1 class="menu-title">SUBWAY SURFER</h1>
                 <p class="menu-subtitle">Neo Edition</p>
                 <div class="tap-to-start pulse">TAP TO START</div>
+                <div class="diff-select">
+                    <button class="diff-btn" data-diff="0">EASY</button>
+                    <button class="diff-btn" data-diff="1">MEDIUM</button>
+                    <button class="diff-btn active" data-diff="2">HARD</button>
+                </div>
                 <div class="menu-controls">
                     <span class="key">←</span> <span class="key">→</span> Move &nbsp;|&nbsp;
                     <span class="key">↑</span> Jump &nbsp;|&nbsp;
                     <span class="key">↓</span> Roll
                 </div>
-                <div class="menu-keys">ESC / P = Pause &nbsp;|&nbsp; M = Menu</div>
+                <div class="menu-keys">ESC / P = Pause &nbsp;|&nbsp; M = Menu &nbsp;|&nbsp; 👁 FPV</div>
                 <div class="menu-mobile-hint">Swipe to play on mobile</div>
             </div>
         `;
@@ -982,8 +991,19 @@
         }
         
         // Menu click/tap to start
-        menuOverlay.addEventListener('click', startGameFromMenu);
-        menuOverlay.addEventListener('touchend', (e) => { e.preventDefault(); startGameFromMenu(); });
+        menuOverlay.addEventListener('click', (e) => { if (e.target.closest('.tap-to-start')) startGameFromMenu(); });
+        menuOverlay.addEventListener('touchend', (e) => { e.preventDefault(); if (e.target.closest('.tap-to-start')) startGameFromMenu(); });
+        
+        // Difficulty buttons
+        document.querySelectorAll('.diff-btn').forEach(btn => {
+            const setDiff = () => {
+                state.difficulty = parseInt(btn.dataset.diff);
+                document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            };
+            btn.addEventListener('click', setDiff);
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); setDiff(); });
+        });
         
         // Pause overlay click to resume
         pauseOverlay.addEventListener('click', togglePause);

@@ -309,3 +309,37 @@ canvas {
 }
 #fpv-btn:hover { background: rgba(0,0,0,0.6); }
 #fpv-btn.active { background: rgba(0,100,200,0.5); border: 1px solid rgba(100,200,255,0.5); }
+
+
+/* ===== DIFFICULTY SELECTOR ===== */
+.diff-select {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+.diff-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.5);
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    pointer-events: auto;
+    letter-spacing: 1px;
+}
+.diff-btn.active {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.6);
+    color: #fff;
+}
+.diff-btn:hover {
+    background: rgba(255,255,255,0.15);
+    transform: scale(1.05);
+}
+.diff-btn[data-diff="0"].active { background: rgba(76,175,80,0.3); border-color: #4CAF50; color: #81C784; }
+.diff-btn[data-diff="1"].active { background: rgba(255,193,7,0.3); border-color: #FFC107; color: #FFD54F; }
+.diff-btn[data-diff="2"].active { background: rgba(244,67,54,0.3); border-color: #F44336; color: #EF9A9A; }
