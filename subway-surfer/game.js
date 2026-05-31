@@ -220,21 +220,56 @@
     function createTrain(lane, zPos) {
         const group = new THREE.Group();
         const laneX = LANE_POSITIONS[lane];
-        const trainColors = [0xcc3333, 0x3366cc, 0x33aa55, 0xcc8833];
+        const colors = [0xE53935, 0x1E88E5, 0x43A047, 0xFB8C00, 0x8E24AA];
+        const mainColor = colors[Math.floor(Math.random() * colors.length)];
 
+        // Main body
         const body = new THREE.Mesh(
             new THREE.BoxGeometry(2.4, 1.8, 6),
-            new THREE.MeshLambertMaterial({ color: trainColors[Math.floor(Math.random() * trainColors.length)] })
+            new THREE.MeshLambertMaterial({ color: mainColor })
         );
         body.position.set(0, 0.9, 0);
         group.add(body);
 
-        const stripe = new THREE.Mesh(
-            new THREE.BoxGeometry(2.0, 0.05, 5.6),
-            new THREE.MeshBasicMaterial({ color: 0xcccccc })
+        // Windows (blue tinted)
+        const winMat = new THREE.MeshBasicMaterial({ color: 0x88CCFF, transparent: true, opacity: 0.7 });
+        for (let i = -1; i <= 1; i++) {
+            for (let side = -1; side <= 1; side += 2) {
+                const win = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.05), winMat);
+                win.position.set(side * 1.21, 1.0, i * 1.5);
+                group.add(win);
+            }
+        }
+
+        // Roof
+        const roof = new THREE.Mesh(
+            new THREE.BoxGeometry(2.0, 0.1, 5.6),
+            new THREE.MeshLambertMaterial({ color: 0xDDDDDD })
         );
-        stripe.position.set(0, 1.85, 0);
-        group.add(stripe);
+        roof.position.set(0, 1.85, 0);
+        group.add(roof);
+
+        // Bottom frame
+        const frame = new THREE.Mesh(
+            new THREE.BoxGeometry(2.2, 0.2, 5.6),
+            new THREE.MeshLambertMaterial({ color: 0x444444 })
+        );
+        frame.position.set(0, 0.1, 0);
+        group.add(frame);
+
+        // Door line (center)
+        const doorMat = new THREE.MeshBasicMaterial({ color: 0xCCCCCC });
+        const door = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.9, 0.6), doorMat);
+        door.position.set(0, 0.8, 0);
+        group.add(door);
+
+        // Headlights
+        const lightMat = new THREE.MeshBasicMaterial({ color: 0xFFFFAA });
+        for (let side = -1; side <= 1; side += 2) {
+            const l = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.05), lightMat);
+            l.position.set(side * 0.6, 0.5, 3.05);
+            group.add(l);
+        }
 
         group.position.set(laneX, 0, zPos);
         group.userData = { type: 'train', lane: lane, width: 2.0, height: 1.8, depth: 5.5 };
@@ -245,19 +280,36 @@
         const group = new THREE.Group();
         const laneX = LANE_POSITIONS[lane];
 
+        // Orange barrier base
         const barrier = new THREE.Mesh(
             new THREE.BoxGeometry(1.6, 0.6, 1.0),
-            new THREE.MeshLambertMaterial({ color: 0xff6600 })
+            new THREE.MeshLambertMaterial({ color: 0xFF6600 })
         );
         barrier.position.set(0, 0.3, 0);
         group.add(barrier);
 
-        const stripe = new THREE.Mesh(
-            new THREE.BoxGeometry(1.5, 0.05, 0.9),
-            new THREE.MeshBasicMaterial({ color: 0xffffff })
+        // White reflective stripes (angled)
+        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+        for (let i = -2; i <= 2; i++) {
+            const s = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.08), stripeMat);
+            s.position.set(i * 0.2, 0.4 + (i % 2) * 0.1, 0.5);
+            s.rotation.x = 0.1;
+            group.add(s);
+        }
+        for (let i = -2; i <= 2; i++) {
+            const s = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.08), stripeMat);
+            s.position.set(i * 0.2, 0.4 + ((i+1) % 2) * 0.1, -0.5);
+            s.rotation.x = -0.1;
+            group.add(s);
+        }
+
+        // Top cap
+        const cap = new THREE.Mesh(
+            new THREE.BoxGeometry(1.4, 0.08, 0.9),
+            new THREE.MeshLambertMaterial({ color: 0xFF8844 })
         );
-        stripe.position.set(0, 0.5, 0);
-        group.add(stripe);
+        cap.position.set(0, 0.65, 0);
+        group.add(cap);
 
         group.position.set(laneX, 0, zPos);
         group.userData = { type: 'barrier', lane: lane, width: 1.6, height: 0.6, depth: 1.0 };
@@ -268,24 +320,52 @@
         const group = new THREE.Group();
         const laneX = LANE_POSITIONS[lane];
 
-        const body = new THREE.Mesh(
-            new THREE.BoxGeometry(2.4, 1.0, 6),
-            new THREE.MeshLambertMaterial({ color: 0x885533 })
+        // Top bar (the obstacle you slide under)
+        const top = new THREE.Mesh(
+            new THREE.BoxGeometry(2.6, 0.5, 5.0),
+            new THREE.MeshLambertMaterial({ color: 0xFF6600 })
         );
-        body.position.set(0, 1.5, 0);
-        group.add(body);
+        top.position.set(0, 1.4, 0);
+        group.add(top);
 
-        const pillarMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
+        // Warning stripe on bottom of bar
+        const stripe = new THREE.Mesh(
+            new THREE.BoxGeometry(2.4, 0.05, 4.8),
+            new THREE.MeshBasicMaterial({ color: 0xFFFFFF })
+        );
+        stripe.position.set(0, 1.15, 0);
+        group.add(stripe);
+
+        // Side supports (left and right only, open in center to roll under)
+        const supMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
+        for (let side = -1; side <= 1; side += 2) {
+            const sup = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.8, 0.15), supMat);
+            sup.position.set(side * 1.2, 0.9, 0);
+            group.add(sup);
+        }
+
+        // Warning signs on sides
+        const warnMat = new THREE.MeshBasicMaterial({ color: 0xFFCC00 });
         for (let side = -1; side <= 1; side += 2) {
             for (let end = -1; end <= 1; end += 2) {
-                const p = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.8, 0.15), pillarMat);
-                p.position.set(side * 1.15, 0.65, end * 2.7);
-                group.add(p);
+                const w = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.08), warnMat);
+                w.position.set(side * 1.25, 1.2, end * 2.4);
+                group.add(w);
+            }
+        }
+
+        // Clearance markers
+        const markerMat = new THREE.MeshBasicMaterial({ color: 0xFF0000 });
+        for (let side = -1; side <= 1; side += 2) {
+            for (let end = -1; end <= 1; end += 2) {
+                const m = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.05), markerMat);
+                m.position.set(side * 1.0, 0.1, end * 2.8);
+                group.add(m);
             }
         }
 
         group.position.set(laneX, 0, zPos);
-        group.userData = { type: 'roll_under', lane: lane, width: 2.0, height: 0.6, depth: 5.5 };
+        group.userData = { type: 'roll_under', lane: lane, width: 2.0, height: 0.5, depth: 5.0 };
         return group;
     }
 
@@ -293,13 +373,34 @@
     function createCoin(lane, zPos, yOffset) {
         const group = new THREE.Group();
         const laneX = LANE_POSITIONS[lane];
+
+        // Coin body (gold cylinder)
         const coin = new THREE.Mesh(
-            new THREE.CylinderGeometry(COIN_RADIUS, COIN_RADIUS, 0.08, 8),
-            new THREE.MeshBasicMaterial({ color: 0xffd700 })
+            new THREE.CylinderGeometry(COIN_RADIUS, COIN_RADIUS, 0.08, 10),
+            new THREE.MeshBasicMaterial({ color: 0xFFD700 })
         );
         coin.rotation.x = Math.PI / 2;
         coin.position.set(0, 0.6 + (yOffset || 0), 0);
         group.add(coin);
+
+        // Glow ring
+        const glow = new THREE.Mesh(
+            new THREE.RingGeometry(COIN_RADIUS * 0.5, COIN_RADIUS * 1.1, 10),
+            new THREE.MeshBasicMaterial({ color: 0xFFD700, transparent: true, opacity: 0.25 })
+        );
+        glow.rotation.x = Math.PI / 2;
+        glow.position.set(0, 0.6 + (yOffset || 0), 0);
+        group.add(glow);
+
+        // Center dot
+        const dot = new THREE.Mesh(
+            new THREE.CircleGeometry(COIN_RADIUS * 0.3, 6),
+            new THREE.MeshBasicMaterial({ color: 0xFFA500 })
+        );
+        dot.rotation.x = Math.PI / 2;
+        dot.position.set(0, 0.6 + (yOffset || 0), 0.01);
+        group.add(dot);
+
         group.position.set(laneX, 0, zPos);
         group.userData = { lane: lane, collected: false };
         return group;
@@ -308,16 +409,32 @@
     function createCoinPattern(lane, zPos, pattern) {
         const coins = [];
         const fn = {
-            line: () => { for (let i = 0; i < 4; i++) coins.push(createCoin(lane, zPos - i * 2.5, 0.2)); },
-            arc: () => { for (let i = 0; i < 5; i++) {
-                const l = Math.max(0, Math.min(2, lane + (i % 3 === 0 ? 1 : i % 3 === 1 ? -1 : 0)));
-                coins.push(createCoin(l, zPos - i * 2, 0.3));
-            }},
-            double: () => { for (let i = 0; i < 3; i++) {
-                coins.push(createCoin(lane, zPos - i * 2, 0.2));
-                coins.push(createCoin(Math.max(0, Math.min(2, lane + (i % 2 === 0 ? 1 : -1))), zPos - i * 2, 0.0));
-            }},
-            single: () => { coins.push(createCoin(lane, zPos, 0.2)); }
+            // Classic Subway Surfers coin arc
+            arc: () => {
+                for (let i = 0; i < 6; i++) {
+                    const l = Math.max(0, Math.min(2, lane + Math.round(Math.sin(i * 1.2) * 1.2)));
+                    const yOff = Math.sin(i * 1.0) * 0.3 + 0.4;
+                    coins.push(createCoin(l, zPos - i * 2.0, yOff));
+                }
+            },
+            // Straight line
+            line: () => { for (let i = 0; i < 5; i++) coins.push(createCoin(lane, zPos - i * 2.2, 0.2)); },
+            // Double lane pattern
+            double: () => {
+                const lanes = [Math.max(0, lane - 1), Math.min(2, lane + 1)];
+                for (let i = 0; i < 4; i++) {
+                    coins.push(createCoin(lanes[i % 2], zPos - i * 1.8, 0.2));
+                }
+            },
+            // Single
+            single: () => { coins.push(createCoin(lane, zPos, 0.3)); },
+            // Zigzag (Subway Surfers classic)
+            zigzag: () => {
+                for (let i = 0; i < 4; i++) {
+                    const l = i % 2 === 0 ? lane : Math.max(0, Math.min(2, lane + (i < 2 ? 1 : -1)));
+                    coins.push(createCoin(l, zPos - i * 2.0, 0.3));
+                }
+            }
         }[pattern] || fn.single;
         fn();
         return coins;
@@ -541,7 +658,7 @@
                 while (coinLane === lane && Math.random() > 0.4) {
                     coinLane = (coinLane + 1) % 3;
                 }
-                const patterns = ['line', 'line', 'arc', 'double'];
+                const patterns = ['line', 'arc', 'double', 'zigzag', 'arc', 'zigzag'];
                 const pattern = patterns[Math.floor(Math.random() * patterns.length)];
                 const coins = createCoinPattern(coinLane, z - 4, pattern);
                 for (const c of coins) {
@@ -706,6 +823,10 @@
         menuOverlay.addEventListener('click', startGameFromMenu);
         menuOverlay.addEventListener('touchend', (e) => { e.preventDefault(); startGameFromMenu(); });
         
+        // Pause overlay click to resume
+        pauseOverlay.addEventListener('click', togglePause);
+        pauseOverlay.addEventListener('touchend', (e) => { e.preventDefault(); togglePause(); });
+        
         // Pause button click
         pauseBtnEl.addEventListener('click', togglePause);
         pauseBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); togglePause(); });
@@ -713,8 +834,8 @@
         // Pause menu - return to menu
         const pauseMenuBtn = document.getElementById('pause-menu-btn');
         if (pauseMenuBtn) {
-            pauseMenuBtn.addEventListener('click', quitToMenu);
-            pauseMenuBtn.addEventListener('touchend', (e) => { e.preventDefault(); quitToMenu(); });
+            pauseMenuBtn.addEventListener('click', (e) => { e.stopPropagation(); quitToMenu(); });
+            pauseMenuBtn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); quitToMenu(); });
         }
     }
 
