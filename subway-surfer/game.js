@@ -276,27 +276,34 @@
         // Ramp (30% of trains - lets player run onto roof)
         const hasRamp = Math.random() < 0.3;
         if (hasRamp) {
-            // Main ramp plate: slopes from ground to roof
-            const rampMat = new THREE.MeshLambertMaterial({ color: 0xFF8800 });
-            const ramp = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, 2.5), rampMat);
-            ramp.position.set(0, 0.8, -2.8);
-            ramp.rotation.x = -0.6;
+            // Bright orange ramp sticking clearly out of the train front
+            const rampMat = new THREE.MeshLambertMaterial({ color: 0xFF6600 });
+            const ramp = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 3.0), rampMat);
+            ramp.position.set(0, 0.9, -4.0);
+            ramp.rotation.x = -0.65;
             group.add(ramp);
             // Side rails
-            const railMat = new THREE.MeshLambertMaterial({ color: 0xDD6600 });
+            const railMat = new THREE.MeshLambertMaterial({ color: 0xDD4400 });
             for (let side = -1; side <= 1; side += 2) {
-                const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.6, 2.5), railMat);
-                rail.position.set(side * 1.1, 1.0, -2.8);
-                rail.rotation.x = -0.6;
-                group.add(rail);
+                const r = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 3.0), railMat);
+                r.position.set(side * 1.2, 1.2, -4.0);
+                r.rotation.x = -0.65;
+                group.add(r);
             }
-            // Warning stripes
+            // White warning stripes on ramp
             const warnMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
-            for (let i = -1; i <= 1; i += 2) {
-                const strip = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.06), warnMat);
-                strip.position.set(i * 0.5, 0.05, -2.0);
-                group.add(strip);
+            for (let i = -2; i <= 2; i++) {
+                if (i === 0) continue;
+                const s = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.02, 0.06), warnMat);
+                s.position.set(0, 0.03, -4.0 + i * 0.5);
+                group.add(s);
             }
+            // Ramp end marker (vertical bar at the tip)
+            const tipMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+            const tip = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.15, 0.05), tipMat);
+            tip.position.set(0, 0.05, -5.3);
+            group.add(tip);
+            
             group.userData.hasRamp = true;
         }
 
@@ -666,7 +673,15 @@
                     }
                 } else {
                     const lane = i % 3;
-                    const type = Math.random();
+                    let type = Math.random();
+                    // Don't place barriers near roll-under gates
+                    if (type >= 0.4 && type < 0.55) {
+                        const hasRollNearby = state.obstacles.some(o =>
+                            o.userData.type === 'roll_under' &&
+                            Math.abs(o.position.z - positions[i]) < 10
+                        );
+                        if (hasRollNearby) type = 0.8;
+                    }
                     let obs;
                     if (type < 0.4) obs = createTrain(lane, z);
                     else if (type < 0.55) obs = createBarrier(lane, z);
@@ -730,7 +745,16 @@
                 const safe = [0,1,2].filter(l => !busy.has(l));
                 const lane = safe.length > 0 ? safe[Math.floor(Math.random() * safe.length)] : Math.floor(Math.random() * 3);
                 
-                const type = Math.random();
+                // Don't place barriers near roll-under gates
+                let type = Math.random();
+                if (type >= 0.4 && type < 0.55) { // barrier candidate
+                    const hasRollUnderNearby = state.obstacles.some(o => 
+                        o.userData.type === 'roll_under' &&
+                        Math.abs(o.position.z - z) < 8
+                    );
+                    if (hasRollUnderNearby) type = 0.8; // change to roll-under
+                }
+                
                 let obs;
                 if (type < 0.4) obs = createTrain(lane, z);
                 else if (type < 0.55) obs = createBarrier(lane, z);
