@@ -279,14 +279,14 @@
             // Bright orange ramp sticking clearly out of the train front
             const rampMat = new THREE.MeshLambertMaterial({ color: 0xFF6600 });
             const ramp = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 3.0), rampMat);
-            ramp.position.set(0, 0.9, -4.0);
+            ramp.position.set(0, 0.9, 3.3);
             ramp.rotation.x = 0.65;
             group.add(ramp);
             // Side rails
             const railMat = new THREE.MeshLambertMaterial({ color: 0xDD4400 });
             for (let side = -1; side <= 1; side += 2) {
                 const r = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 3.0), railMat);
-                r.position.set(side * 1.2, 1.2, -4.0);
+                r.position.set(side * 1.2, 1.2, 3.3);
                 r.rotation.x = 0.65;
                 group.add(r);
             }
@@ -295,13 +295,13 @@
             for (let i = -2; i <= 2; i++) {
                 if (i === 0) continue;
                 const s = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.02, 0.06), warnMat);
-                s.position.set(0, 0.03, -4.0 + i * 0.5);
+                s.position.set(0, 0.03, 3.3 + i * 0.5);
                 group.add(s);
             }
             // Ramp end marker (vertical bar at the tip)
             const tipMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
             const tip = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.15, 0.05), tipMat);
-            tip.position.set(0, 0.05, -5.3);
+            tip.position.set(0, 0.05, 4.6);
             group.add(tip);
             
             group.userData.hasRamp = true;
@@ -1154,7 +1154,7 @@
     }
 
     function roll() {
-        if (state.isRolling || state.isJumping) return;
+        if (state.isRolling) return;
         state.isRolling = true;
         state.targetPlayerHeight = ROLL_HEIGHT;
         playRollSound();
@@ -1203,11 +1203,11 @@
                 continue;
             }
             
-            // Ramp train: board the roof when reaching the front of the train
+            // Ramp train: board from the BACK of the train (ramp is behind)
             if (od.type === 'train' && od.hasRamp && !state.onRoof) {
-                const trainFront = obs.position.z - (od.depth || 5.5) / 2;
-                // Player can board from the front edge of the train
-                if (playerPos.z >= trainFront - 1.0 && playerPos.z <= trainFront + 3.5 &&
+                const trainBack = obs.position.z + (od.depth || 5.5) / 2;
+                // Player runs up the ramp from behind
+                if (playerPos.z >= trainBack - 2.0 && playerPos.z <= trainBack + 2.5 &&
                     Math.abs(playerPos.x - obsBox.x) < 1.5) {
                     state.onRoof = true;
                     continue;
