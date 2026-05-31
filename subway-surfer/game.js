@@ -685,14 +685,25 @@
         }
 
         // Fill the pipe: keep enough obstacles ahead of the player
-        // Count obstacles in the visible & near-visible range
         const ahead = state.obstacles.filter(o => o.position.z > -90 && o.position.z < 0);
+
         
-        // Always keep at least 6 obstacles approaching
-        if (ahead.length < 6) {
-            // Spawn one at the far edge of visible range
-            const z = -55 - Math.random() * 25;
+
+        // Speed-dependent pipe: more obstacles at higher speed
+
+        const targetCount = Math.min(6 + Math.floor(state.speed * 6), 18);
+
+        const spawnZ = -(45 + state.speed * 30) - Math.random() * 15;
+
+        
+
+        if (ahead.length < targetCount) {
+
+            const z = spawnZ;
+
             
+
+            // Rare double obstacle (8%)
             // Rare double obstacle (8%)
             if (Math.random() < 0.08) {
                 const openLane = Math.floor(Math.random() * 3);
