@@ -235,3 +235,44 @@ canvas {
 .pulse {
     animation: pulse 1.5s ease-in-out infinite;
 }
+
+/* ===== MOBILE CONTROLS ===== */
+#mobile-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 15px;
+    z-index: 15;
+    pointer-events: none;
+}
+
+.m-btn {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.7);
+    font-size: 22px;
+    pointer-events: auto;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.m-btn:active {
+    background: rgba(255,255,255,0.3);
+    transform: scale(0.9);
+}
+
+/* Hide mobile controls on desktop */
+@media (hover: hover) and (pointer: fine) {
+    #mobile-controls { display: none; }
+}

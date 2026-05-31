@@ -612,7 +612,7 @@
         if (state.obstacles.length === 0) {
             // Initial: scatter one per lane with big gaps
             // Pattern: each obstacle blocks 1 lane, player dodges to other 2
-            const positions = [-30, -50, -70, -90, -110];
+            const positions = [-30, -48, -66, -84, -102, -120, -138];
             const laneOrder = [0, 1, 2];
             for (let i = 0; i < positions.length; i++) {
                 const lane = laneOrder[i % 3];
@@ -642,11 +642,11 @@
             if (o.position.z < farthestZ) farthestZ = o.position.z;
         }
         // Spawn one new obstacle when the farthest has moved close (past -45)
-        if (farthestZ > -35) {
+        if (farthestZ > -25) {
             // Check which lanes are blocked near the spawn area
             const busy = new Set();
             for (const o of state.obstacles) {
-                if (o.position.z > -50 && o.position.z < 10) {
+                if (o.position.z > -40 && o.position.z < 10) {
                     const l = Math.round((o.position.x + LANE_WIDTH) / LANE_WIDTH);
                     if (l >= 0 && l <= 2) busy.add(l);
                 }
@@ -655,7 +655,7 @@
             const safe = [0,1,2].filter(l => !busy.has(l));
             const lane = safe.length > 0 ? safe[Math.floor(Math.random() * safe.length)] : Math.floor(Math.random() * 3);
             
-            const z = -55 - Math.random() * 15;
+            const z = -45 - Math.random() * 15;
             const type = Math.random();
             let obs;
             if (type < 0.5) obs = createTrain(lane, z);
@@ -740,6 +740,17 @@
         pauseBtnEl.textContent = '⏸';
         pauseBtnEl.style.display = 'none';
         uiOverlay.appendChild(pauseBtnEl);
+        
+        // ===== MOBILE CONTROLS (virtual buttons) =====
+        const mobileCtrl = document.createElement('div');
+        mobileCtrl.id = 'mobile-controls';
+        mobileCtrl.innerHTML = `
+            <button class="m-btn" id="m-left">◀</button>
+            <button class="m-btn" id="m-jump">▲</button>
+            <button class="m-btn" id="m-roll">▼</button>
+            <button class="m-btn" id="m-right">▶</button>
+        `;
+        uiOverlay.appendChild(mobileCtrl);
 
         // Score display
         const scoreDiv = document.createElement('div');
@@ -765,15 +776,16 @@
         scoreDiv.appendChild(distSpan);
         scoreDiv.appendChild(mSpan);
         
-        // Best score on HUD
-        const bestSmall = document.createElement('div');
-        bestSmall.style.cssText = 'font-size:13px;color:rgba(136,204,255,0.6);margin-top:4px;';
-        bestSmall.textContent = 'BEST: ' + state.bestScore + 'm';
-        scoreDiv.appendChild(bestSmall);
-        
         uiOverlay.appendChild(scoreDiv);
         scoreEl = distCount;
         coinsEl = coinCount;
+        
+        // Best score on HUD (separate element for easy updates)
+        const bestSmall = document.createElement('div');
+        bestSmall.id = 'hud-best';
+        bestSmall.style.cssText = 'position:absolute;top:72px;left:50%;transform:translateX(-50%);font-size:13px;color:rgba(136,204,255,0.6);text-shadow:0 1px 5px rgba(0,0,0,0.8);pointer-events:none;';
+        bestSmall.textContent = 'BEST: ' + state.bestScore + 'm';
+        uiOverlay.appendChild(bestSmall);
 
         // Speed indicator
         const speedDiv = document.createElement('div');
@@ -878,6 +890,19 @@
             pauseMenuBtn.addEventListener('click', (e) => { e.stopPropagation(); quitToMenu(); });
             pauseMenuBtn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); quitToMenu(); });
         }
+        
+        // Mobile buttons
+        function bindMobileBtn(id, action) {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const handler = (e) => { e.preventDefault(); e.stopPropagation(); if (state.started && !state.paused && !state.gameOver) action(); };
+            btn.addEventListener('touchstart', handler, { passive: false });
+            btn.addEventListener('mousedown', handler);
+        }
+        bindMobileBtn('m-left', moveLeft);
+        bindMobileBtn('m-right', moveRight);
+        bindMobileBtn('m-jump', jump);
+        bindMobileBtn('m-roll', roll);
     }
 
     // ========== CONTROLS ==========
@@ -1290,6 +1315,10 @@
             speedEl.textContent = `SPD: ${Math.min(speedLevel, 10)}x`;
             speedEl.style.color = speedLevel > 7 ? 'rgba(255,100,100,0.7)' : 'rgba(255,255,255,0.5)';
         }
+        
+        // Update best score HUD
+        const hudBest = document.getElementById('hud-best');
+        if (hudBest) hudBest.textContent = 'BEST: ' + state.bestScore + 'm';
 
         // Instructions fade
         if (state.instructionTimer > 0) {
@@ -1303,7 +1332,7 @@
 
         // Move track segments
         for (const seg of state.trackSegments) {
-            seg.position.z += state.speed;
+            seg.position.z += state.speed * delta * 60;
         }
 
         // Recycle track segments
@@ -1315,12 +1344,12 @@
 
         // Move obstacles
         for (const obs of state.obstacles) {
-            obs.position.z += state.speed;
+            obs.position.z += state.speed * delta * 60;
         }
 
         // Move coins
         for (const coin of state.coinObjects) {
-            coin.position.z += state.speed;
+            coin.position.z += state.speed * delta * 60;
             // Spin
             coin.rotation.y += delta * 3;
             // Bob
@@ -1335,7 +1364,7 @@
 
         // Move buildings
         for (const b of state.buildings) {
-            b.position.z += state.speed;
+            b.position.z += state.speed * delta * 60;
         }
 
         // Move particles
