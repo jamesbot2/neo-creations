@@ -279,14 +279,14 @@
             // Bright orange ramp sticking clearly out of the train front
             const rampMat = new THREE.MeshLambertMaterial({ color: 0xFF6600 });
             const ramp = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 3.0), rampMat);
-            ramp.position.set(0, 0.9, 3.3);
+            ramp.position.set(0, 0.9, 4.5);
             ramp.rotation.x = 0.65;
             group.add(ramp);
             // Side rails
             const railMat = new THREE.MeshLambertMaterial({ color: 0xDD4400 });
             for (let side = -1; side <= 1; side += 2) {
                 const r = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 3.0), railMat);
-                r.position.set(side * 1.2, 1.2, 3.3);
+                r.position.set(side * 1.2, 1.2, 4.5);
                 r.rotation.x = 0.65;
                 group.add(r);
             }
@@ -295,13 +295,13 @@
             for (let i = -2; i <= 2; i++) {
                 if (i === 0) continue;
                 const s = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.02, 0.06), warnMat);
-                s.position.set(0, 0.03, 3.3 + i * 0.5);
+                s.position.set(0, 0.03, 4.5 + i * 0.5);
                 group.add(s);
             }
             // Ramp end marker (vertical bar at the tip)
             const tipMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
             const tip = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.15, 0.05), tipMat);
-            tip.position.set(0, 0.05, 4.6);
+            tip.position.set(0, 0.05, 5.8);
             group.add(tip);
             
             group.userData.hasRamp = true;
@@ -1207,7 +1207,7 @@
             if (od.type === 'train' && od.hasRamp && !state.onRoof) {
                 const trainBack = obs.position.z + (od.depth || 5.5) / 2;
                 // Player runs up the ramp from behind
-                if (playerPos.z >= trainBack - 2.0 && playerPos.z <= trainBack + 2.5 &&
+                if (playerPos.z >= trainBack - 1.5 && playerPos.z <= trainBack + 3.5 &&
                     Math.abs(playerPos.x - obsBox.x) < 1.5) {
                     state.onRoof = true;
                     continue;
@@ -1517,15 +1517,7 @@
                 state.playerHeight = PLAYER_Y;
                 state.isJumping = false;
                 state.jumpVelocity = 0;
-                // Landing while rolling: keep sliding
-                if (state.isRolling) {
-                    setTimeout(() => {
-                        if (state.isRolling && !state.isJumping) {
-                            state.isRolling = false;
-                            state.targetPlayerHeight = PLAYER_Y;
-                        }
-                    }, 400);
-                }
+                // Landing while rolling: keep sliding (release down key to stand)
             }
         }
 
