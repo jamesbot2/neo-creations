@@ -611,7 +611,7 @@
         if (state.obstacles.length === 0) {
             // Initial: scatter one per lane with big gaps
             // Pattern: each obstacle blocks 1 lane, player dodges to other 2
-            const positions = [-10, -35, -60];
+            const positions = [-40, -65, -90];
             const laneOrder = [0, 1, 2];
             for (let i = 0; i < positions.length; i++) {
                 const lane = laneOrder[i % 3];
@@ -625,6 +625,12 @@
                 state.obstacles.push(obs);
                 state.coinObstacleMap.set(obs.uuid, []);
                 spawnCoinsNearObstacle(obs, lane, z);
+            }
+            // Coins in the safe zone
+            for (let z = -5; z > -35; z -= 5) {
+                const coin = createCoin(Math.floor(Math.random() * 3), z, 0.3);
+                scene.add(coin);
+                state.coinObjects.push(coin);
             }
             return;
         }
@@ -1163,9 +1169,37 @@
     // ========== GAME FLOW ==========
     function restartGame() {
         resetAllGameObjects();
+        
+        // Full state reset
+        state.score = 0;
+        state.coins = 0;
+        state.speed = START_SPEED;
         state.gameOver = false;
         state.started = true;
         state.paused = false;
+        state.currentLane = 1;
+        state.targetLane = 1;
+        state.laneLerp = 1;
+        state.isJumping = false;
+        state.isRolling = false;
+        state.jumpVelocity = 0;
+        state.playerHeight = PLAYER_Y;
+        state.targetPlayerHeight = PLAYER_Y;
+        state.lastObstacleZ = 0;
+        state.gameTime = 0;
+        state.scoreTimer = 0;
+        state.cameraShake = 0;
+        state.hasStartedTouch = false;
+        
+        // Reset player to center lane
+        player.position.set(0, PLAYER_Y, 0);
+        player.rotation.set(0, 0, 0);
+        player.scale.set(1, 1, 1);
+        
+        // Reset camera
+        camera.position.set(0, 5.5, 7);
+        camera.lookAt(0, 0, -10);
+        
         pauseBtnEl.style.display = 'block';
         pauseBtnEl.textContent = '\u23F8';
         gameOverEl.classList.remove('visible');
