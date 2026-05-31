@@ -1228,37 +1228,46 @@
     }
 
     function updateCamera() {
-        const targetCameraPos = {
-            x: player.position.x * 0.4,
-            y: state.isRolling ? 5.5 : 6,
-            z: player.position.z + 8
-        };
+        if (!player || !camera) return;
+        
+        // Clamp player position to prevent NaN wiping the render
+        if (isNaN(player.position.x)) player.position.x = 0;
+        if (isNaN(player.position.y)) player.position.y = PLAYER_Y;
+        if (isNaN(player.position.z)) player.position.z = 0;
 
-        // Shake
-        let shakeOffset = { x: 0, y: 0, z: 0 };
+        // Camera follows player directly, centered on their lane
+        const targetX = player.position.x;
+        const targetY = state.isRolling ? 5 : 5.5;
+        const targetZ = player.position.z + 7;
+
+        let shakeX = 0, shakeY = 0;
         if (state.cameraShake > 0.01) {
-            shakeOffset.x = (Math.random() - 0.5) * state.cameraShake * 0.3;
-            shakeOffset.y = (Math.random() - 0.5) * state.cameraShake * 0.3;
-            shakeOffset.z = (Math.random() - 0.5) * state.cameraShake * 0.1;
+            shakeX = (Math.random() - 0.5) * state.cameraShake * 0.3;
+            shakeY = (Math.random() - 0.5) * state.cameraShake * 0.3;
         }
 
-        camera.position.x += (targetCameraPos.x + shakeOffset.x - camera.position.x) * 0.08;
-        camera.position.y += (targetCameraPos.y + shakeOffset.y - camera.position.y) * 0.08;
-        camera.position.z += (targetCameraPos.z + shakeOffset.z - camera.position.z) * 0.08;
+        // Smooth follow
+        camera.position.x += (targetX + shakeX - camera.position.x) * 0.1;
+        camera.position.y += (targetY + shakeY - camera.position.y) * 0.1;
+        camera.position.z += (targetZ - camera.position.z) * 0.1;
 
-        const targetLook = new THREE.Vector3(
-            player.position.x * 0.3,
-            0.5,
-            player.position.z - 8
-        );
-        camera.lookAt(targetLook);
+        camera.lookAt(player.position.x, 0, player.position.z - 10);
     }
 
     // ========== RENDER LOOP ==========
     function animate() {
-        requestAnimationFrame(animate);
-        update();
-        renderer.render(scene, camera);
+        try {
+            requestAnimationFrame(animate);
+            update();
+            // Safety: ensure camera is valid before rendering
+            if (camera && !isNaN(camera.position.x)) {
+                renderer.render(scene, camera);
+            }
+        } catch(e) {
+            console.error('Game error:', e);
+            // Try to recover on next frame
+            requestAnimationFrame(animate);
+        }
     }
 
     // ========== INIT ==========
