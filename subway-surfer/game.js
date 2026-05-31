@@ -1018,31 +1018,43 @@
     // ========== COLLISION DETECTION ==========
     function checkCollisions() {
         const playerPos = player.position;
-        const playerLane = state.currentLane;
-        const playerX = LANE_POSITIONS[playerLane];
         const playerHitbox = {
-            x: playerX,
-            y: state.isRolling ? ROLL_HEIGHT / 2 : state.isJumping ? PLAYER_Y : PLAYER_Y,
+            x: playerPos.x,
+            y: playerPos.y + (state.isRolling ? 0.1 : 0.7),
             z: playerPos.z,
-            w: 0.5,
-            h: state.isRolling ? ROLL_HEIGHT * 0.8 : 1.4,
-            d: 0.4
+            w: 0.4,
+            h: state.isRolling ? 0.3 : 1.2,
+            d: 0.3
         };
 
         for (const obs of state.obstacles) {
             const od = obs.userData;
+            
+            // Train: height=1.8, visual body center at y=0.9
+            // Barrier: height=0.6, visual body center at y=0.3
+            // Roll-under: height=0.5 (gap), top bar at y=1.4
+            let obsY, obsH;
+            if (od.type === 'roll_under') {
+                // Top bar is at y=1.4, height 0.5, so center at y=1.65
+                obsY = 1.65;
+                obsH = 0.5;
+            } else {
+                // Use the position from the group + reported height
+                obsY = obs.position.y + (od.height || 0.6) / 2;
+                obsH = od.height || 0.6;
+            }
+            
             const obsBox = {
                 x: obs.position.x,
-                y: obs.position.y + (od.height || 0.6) / 2,
+                y: obsY,
                 z: obs.position.z,
                 w: od.width || 1.6,
-                h: od.height || 0.6,
+                h: obsH,
                 d: od.depth || 1.0
             };
 
-            // For roll_under obstacles, check if player is rolling
+            // Roll under: player rolling can pass under
             if (od.type === 'roll_under' && state.isRolling) {
-                // Player rolling can pass under
                 continue;
             }
 
@@ -1050,14 +1062,13 @@
             const dx = Math.abs(playerHitbox.x - obsBox.x);
             const dz = Math.abs(playerHitbox.z - obsBox.z);
             const dy = Math.abs(playerHitbox.y - obsBox.y);
-
-            // Extend Z detection slightly for trains (longer)
-            const zThreshold = (playerHitbox.d + obsBox.d) / 2 + 0.2;
+            
+            // Z threshold: trains are long, barriers are short
+            const zThreshold = (playerHitbox.d + obsBox.d) / 2 + 0.1;
 
             if (dx < (playerHitbox.w + obsBox.w) / 2 &&
                 dz < zThreshold &&
-                dy < (playerHitbox.h + obsBox.h) / 2) {
-                // COLLISION!
+                dy < (playerHitbox.h + obsH) / 2) {
                 return true;
             }
         }
