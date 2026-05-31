@@ -53,7 +53,8 @@
         started: false,
         paused: false,
         startLaneX: 0,
-        bestScore: parseInt(localStorage.getItem('subwayBest') || '0')
+        bestScore: parseInt(localStorage.getItem('subwayBest') || '0'),
+        onRoof: false
     };
 
     // ========== THREE.JS SETUP ==========
@@ -271,9 +272,39 @@
             l.position.set(side * 0.6, 0.5, 3.05);
             group.add(l);
         }
+        
+        // Ramp (30% of trains - lets player run onto roof)
+        const hasRamp = Math.random() < 0.3;
+        if (hasRamp) {
+            const rampMat = new THREE.MeshLambertMaterial({ color: 0xFF8800 });
+            const ramp = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.8), rampMat);
+            ramp.position.set(0, 0.3, -3.3);
+            ramp.rotation.x = -0.5;
+            group.add(ramp);
+            // Side rails on ramp
+            const railMat = new THREE.MeshLambertMaterial({ color: 0xDD6600 });
+            for (let side = -1; side <= 1; side += 2) {
+                const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.8), railMat);
+                rail.position.set(side * 1.1, 0.4, -3.3);
+                group.add(rail);
+            }
+            // Warning stripes on ramp
+            const warnMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+            for (let i = -1; i <= 1; i += 2) {
+                const strip = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.06), warnMat);
+                strip.position.set(i * 0.4, 0.04, -3.05);
+                group.add(strip);
+            }
+            group.userData.hasRamp = true;
+        }
 
         group.position.set(laneX, 0, zPos);
-        group.userData = { type: 'train', lane: lane, width: 2.0, height: 1.8, depth: 5.5 };
+        group.userData.type = 'train';
+        group.userData.lane = lane;
+        group.userData.width = 2.0;
+        group.userData.height = 1.8;
+        group.userData.depth = 5.5;
+        group.userData.hasRamp = hasRamp;
         return group;
     }
 
@@ -1086,16 +1117,10 @@
     }
 
     function roll() {
-        if (state.isRolling) return; // already rolling
+        if (state.isRolling || state.isJumping) return;
         state.isRolling = true;
         state.targetPlayerHeight = ROLL_HEIGHT;
         playRollSound();
-        setTimeout(() => {
-            if (state.isRolling) {
-                state.isRolling = false;
-                state.targetPlayerHeight = PLAYER_Y;
-            }
-        }, 500);
     }
 
     // ========== COLLISION DETECTION ==========
@@ -1139,6 +1164,23 @@
             // Roll under: player rolling can pass under
             if (od.type === 'roll_under' && state.isRolling) {
                 continue;
+            }
+            
+            // Roof: skip collision when riding on train roofs
+            if (state.onRoof && od.type === 'train') {
+                continue;
+            }
+            
+            // Ramp train: board the roof instead of dying
+            if (od.type === 'train' && od.hasRamp && !state.onRoof && !state.isJumping) {
+                // Check if player is at the ramp edge (front of train)
+                const rampZ = obs.position.z - obsBox.d / 2 - 0.5; // front edge + ramp extension
+                const playerAtRamp = Math.abs(playerPos.z - rampZ) < 1.5 &&
+                                    Math.abs(playerPos.x - obsBox.x) < 1.5;
+                if (playerAtRamp) {
+                    state.onRoof = true;
+                    continue; // skip death
+                }
             }
 
             // AABB collision
@@ -1225,6 +1267,7 @@
         state.instructionTimer = 8;
         state.cameraShake = 0;
         state.hasStartedTouch = false;
+        state.onRoof = false;
 
         player.position.set(0, 0, 0);
         player.rotation.set(0, 0, 0);
@@ -1253,6 +1296,7 @@
         state.gameOver = false;
         state.started = true;
         state.paused = false;
+        state.onRoof = false;
         state.currentLane = 1;
         state.targetLane = 1;
         state.laneLerp = 1;
@@ -1463,6 +1507,31 @@
             if (!state.isJumping) player.position.y = state.playerHeight;
         } else {
             player.scale.y += (1 - player.scale.y) * 0.15;
+        }
+        
+        // Release roll when down key not held
+        if (state.isRolling && !state.isJumping) {
+            const downHeld = keys['ArrowDown'] || keys['s'] || keys['S'];
+            if (!downHeld) {
+                state.isRolling = false;
+                state.targetPlayerHeight = PLAYER_Y;
+            }
+        }
+        
+        // Roof mechanics: ride on train roofs
+        if (state.onRoof) {
+            // Stay at roof height
+            state.playerHeight = 1.8 + PLAYER_Y;
+            player.position.y = state.playerHeight;
+            // Check if player should fall off (roof ended)
+            const hasRoofBelow = state.obstacles.some(o => 
+                o.userData.type === 'train' && 
+                Math.abs(o.position.z - 0) < 3 &&
+                Math.abs(o.position.x - player.position.x) < 1.5
+            );
+            if (!hasRoofBelow) {
+                state.onRoof = false;
+            }
         }
 
         // Running animation - skip during roll or jump
