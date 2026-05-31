@@ -1166,21 +1166,20 @@
                 continue;
             }
             
+            // Ramp train: board the roof when reaching the front of the train
+            if (od.type === 'train' && od.hasRamp && !state.onRoof) {
+                const trainFront = obs.position.z - (od.depth || 5.5) / 2;
+                // Player can board from the front edge of the train
+                if (playerPos.z >= trainFront - 1.0 && playerPos.z <= trainFront + 2.5 &&
+                    Math.abs(playerPos.x - obsBox.x) < 1.5) {
+                    state.onRoof = true;
+                    continue;
+                }
+            }
+            
             // Roof: skip collision when riding on train roofs
             if (state.onRoof && od.type === 'train') {
                 continue;
-            }
-            
-            // Ramp train: board the roof instead of dying
-            if (od.type === 'train' && od.hasRamp && !state.onRoof && !state.isJumping) {
-                // Check if player is at the ramp edge (front of train)
-                const rampZ = obs.position.z - obsBox.d / 2 - 0.5; // front edge + ramp extension
-                const playerAtRamp = Math.abs(playerPos.z - rampZ) < 1.5 &&
-                                    Math.abs(playerPos.x - obsBox.x) < 1.5;
-                if (playerAtRamp) {
-                    state.onRoof = true;
-                    continue; // skip death
-                }
             }
 
             // AABB collision
