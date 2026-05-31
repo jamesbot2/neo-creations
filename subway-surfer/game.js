@@ -280,14 +280,14 @@
             const rampMat = new THREE.MeshLambertMaterial({ color: 0xFF6600 });
             const ramp = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 3.0), rampMat);
             ramp.position.set(0, 0.9, -4.0);
-            ramp.rotation.x = -0.65;
+            ramp.rotation.x = 0.65;
             group.add(ramp);
             // Side rails
             const railMat = new THREE.MeshLambertMaterial({ color: 0xDD4400 });
             for (let side = -1; side <= 1; side += 2) {
                 const r = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 3.0), railMat);
                 r.position.set(side * 1.2, 1.2, -4.0);
-                r.rotation.x = -0.65;
+                r.rotation.x = 0.65;
                 group.add(r);
             }
             // White warning stripes on ramp
