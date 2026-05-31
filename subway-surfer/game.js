@@ -54,7 +54,8 @@
         paused: false,
         startLaneX: 0,
         bestScore: parseInt(localStorage.getItem('subwayBest') || '0'),
-        onRoof: false
+        onRoof: false,
+        rollEndTime: 0
     };
 
     // ========== THREE.JS SETUP ==========
@@ -1158,6 +1159,7 @@
         if (state.isRolling) return;
         state.isRolling = true;
         state.targetPlayerHeight = ROLL_HEIGHT;
+        state.rollEndTime = Date.now() + 400;
         playRollSound();
     }
 
@@ -1547,10 +1549,15 @@
             player.scale.y += (1 - player.scale.y) * 0.15;
         }
         
-        // Release roll when down key not held
+        // Release roll when down key not held (with min 350ms swipe duration)
         if (state.isRolling && !state.isJumping) {
+            const now = Date.now();
             const downHeld = keys['ArrowDown'] || keys['s'] || keys['S'];
-            if (!downHeld) {
+            if (downHeld) {
+                state.rollEndTime = now + 100; // extend while held
+            } else if (now < state.rollEndTime) {
+                // Still within minimum roll duration (from swipe)
+            } else {
                 state.isRolling = false;
                 state.targetPlayerHeight = PLAYER_Y;
             }
