@@ -51,7 +51,8 @@
         instructionTimer: 8,
         hasStartedTouch: false,
         started: false,
-        paused: false
+        paused: false,
+        startLaneX: 0
     };
 
     // ========== THREE.JS SETUP ==========
@@ -813,6 +814,7 @@
 
     function moveLeft() {
         if (state.currentLane > 0) {
+            state.startLaneX = player.position.x;
             state.currentLane--;
             state.targetLane = state.currentLane;
             state.laneLerp = 0;
@@ -821,6 +823,7 @@
 
     function moveRight() {
         if (state.currentLane < LANE_COUNT - 1) {
+            state.startLaneX = player.position.x;
             state.currentLane++;
             state.targetLane = state.currentLane;
             state.laneLerp = 0;
@@ -1116,8 +1119,9 @@
             state.laneLerp += delta * 10;
             if (state.laneLerp > 1) state.laneLerp = 1;
             const targetX = LANE_POSITIONS[state.targetLane];
-            const startX = LANE_POSITIONS[state.targetLane - (state.targetLane > state.currentLane ? 1 : -1)];
-            player.position.x = startX + (targetX - startX) * easeOutQuad(state.laneLerp);
+            player.position.x = state.startLaneX + (targetX - state.startLaneX) * easeOutQuad(state.laneLerp);
+        } else {
+            player.position.x = LANE_POSITIONS[state.currentLane];
         }
 
         // Jump physics
