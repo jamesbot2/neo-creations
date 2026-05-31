@@ -59,7 +59,6 @@
     let directionLight, ambientLight;
     let player;
     let playerBody, playerHead, playerLeftArm, playerRightArm, playerLeftLeg, playerRightLeg;
-    let groundMaterial, railMaterial, sleeperMaterial, buildingMaterial;
 
     // UI Elements
     let scoreEl, coinsEl, gameOverEl, finalScoreEl, finalCoinsEl, restartBtnEl, instructionsEl, speedEl;
@@ -67,278 +66,10 @@
     let uiOverlay;
 
     // ========== TEXTURE GENERATION ==========
-    function generateGroundTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
 
-        // Asphalt base
-        ctx.fillStyle = '#3a3a3e';
-        ctx.fillRect(0, 0, 512, 512);
 
-        // Add noise grain
-        for (let i = 0; i < 8000; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const shade = 40 + Math.random() * 30;
-            ctx.fillStyle = `rgb(${shade},${shade},${shade + 2})`;
-            ctx.fillRect(x, y, 2, 2);
-        }
 
-        // Lane markings - dashed white lines
-        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-        ctx.lineWidth = 4;
-        ctx.setLineDash([30, 20]);
 
-        // Lane dividers
-        const laneW = 512 / 3;
-        for (let i = 1; i < 3; i++) {
-            ctx.beginPath();
-            ctx.moveTo(i * laneW, 0);
-            ctx.lineTo(i * laneW, 512);
-            ctx.stroke();
-        }
-
-        // Side edges
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([20, 15]);
-        ctx.beginPath();
-        ctx.moveTo(8, 0);
-        ctx.lineTo(8, 512);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(504, 0);
-        ctx.lineTo(504, 512);
-        ctx.stroke();
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(1, 20);
-        texture.anisotropy = 4;
-        return texture;
-    }
-
-    function generateRailTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-
-        // Metal base
-        const grad = ctx.createLinearGradient(0, 0, 256, 0);
-        grad.addColorStop(0, '#5a4a3a');
-        grad.addColorStop(0.3, '#8a7a6a');
-        grad.addColorStop(0.5, '#9a9a8a');
-        grad.addColorStop(0.7, '#8a7a6a');
-        grad.addColorStop(1, '#5a4a3a');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 256, 256);
-
-        // Cross ties (sleepers)
-        ctx.fillStyle = '#4a3520';
-        for (let i = 0; i < 12; i++) {
-            const y = i * 22 + 5;
-            ctx.fillRect(5, y, 246, 12);
-            // Wood grain
-            ctx.fillStyle = '#5a4530';
-            ctx.fillRect(5, y + 3, 246, 2);
-            ctx.fillRect(5, y + 7, 246, 1);
-            ctx.fillStyle = '#4a3520';
-        }
-
-        // Rail tracks (two lines on top of sleepers)
-        ctx.strokeStyle = '#6a6a7a';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(30, 0);
-        ctx.lineTo(30, 256);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(226, 0);
-        ctx.lineTo(226, 256);
-        ctx.stroke();
-
-        // Rail shine
-        ctx.strokeStyle = 'rgba(200,200,220,0.2)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(28, 0);
-        ctx.lineTo(28, 256);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(224, 0);
-        ctx.lineTo(224, 256);
-        ctx.stroke();
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(1, 8);
-        return texture;
-    }
-
-    function generateBuildingTexture(variant) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-
-        const colors = [
-            ['#c4956a', '#e8c8a0'], // Beige
-            ['#b55a3a', '#c87a5a'], // Brick
-            ['#8a9a7a', '#aabaaa'], // Sage
-            ['#6a7a8a', '#8a9aaa'], // Blue-gray
-            ['#9a7a5a', '#ba9a7a'], // Tan
-            ['#7a5a5a', '#9a7a7a']  // Maroon
-        ];
-        const c = colors[variant % colors.length];
-
-        // Base wall
-        ctx.fillStyle = c[0];
-        ctx.fillRect(0, 0, 256, 256);
-
-        // Brick/panel pattern
-        ctx.strokeStyle = c[1];
-        ctx.lineWidth = 1;
-        for (let row = 0; row < 16; row++) {
-            const y = row * 16;
-            const offset = (row % 2) * 8;
-            for (let col = 0; col < 16; col++) {
-                const x = col * 16 + offset - (row % 2) * 8;
-                ctx.strokeRect(x, y, 16, 16);
-            }
-        }
-
-        // Windows
-        for (let row = 0; row < 4; row++) {
-            for (let col = 0; col < 4; col++) {
-                const x = col * 64 + 10;
-                const y = row * 64 + 12;
-                // Window frame
-                ctx.fillStyle = '#2a3a4a';
-                ctx.fillRect(x, y, 44, 40);
-                // Window glass (some lit, some dark)
-                const lit = Math.random() > 0.4;
-                ctx.fillStyle = lit ? '#4a6a8a' : '#1a2a3a';
-                ctx.fillRect(x + 4, y + 4, 36, 32);
-                // Window cross
-                ctx.strokeStyle = 'rgba(200,200,200,0.2)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(x + 22, y + 4);
-                ctx.lineTo(x + 22, y + 36);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x + 4, y + 20);
-                ctx.lineTo(x + 40, y + 20);
-                ctx.stroke();
-                // Lit glow
-                if (lit) {
-                    ctx.fillStyle = 'rgba(200,220,255,0.08)';
-                    ctx.fillRect(x + 4, y + 4, 36, 32);
-                }
-            }
-        }
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(1, 1);
-        return texture;
-    }
-
-    function generateTrainTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-
-        const colors = ['#cc3333', '#3366cc', '#ccaa22', '#33aa55', '#cc6633', '#8833cc'];
-        const mainColor = colors[Math.floor(Math.random() * colors.length)];
-
-        // Main body
-        ctx.fillStyle = mainColor;
-        ctx.fillRect(0, 0, 256, 256);
-
-        // Horizontal stripe
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.fillRect(0, 80, 256, 30);
-        ctx.fillRect(0, 160, 256, 30);
-
-        // Windows
-        ctx.fillStyle = '#5a8aaa';
-        for (let i = 0; i < 5; i++) {
-            ctx.fillRect(15 + i * 48, 100, 30, 50);
-        }
-
-        // Panel lines
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-        ctx.lineWidth = 2;
-        for (let i = 0; i < 6; i++) {
-            const x = i * 43;
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, 256);
-            ctx.stroke();
-        }
-
-        // Rust/dirt bottom
-        ctx.fillStyle = 'rgba(0,0,0,0.15)';
-        ctx.fillRect(0, 210, 256, 46);
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-        return texture;
-    }
-
-    function generateCoinTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-
-        // Gradient circle for gold coin
-        const grad = ctx.createRadialGradient(64, 64, 5, 64, 64, 58);
-        grad.addColorStop(0, '#fff5a0');
-        grad.addColorStop(0.2, '#ffd700');
-        grad.addColorStop(0.5, '#daa520');
-        grad.addColorStop(0.8, '#b8860b');
-        grad.addColorStop(1, '#8b6914');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(64, 64, 58, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Edge bevel
-        ctx.strokeStyle = '#8b6914';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(64, 64, 56, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Inner ring
-        ctx.strokeStyle = 'rgba(255,255,200,0.4)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(64, 64, 40, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Star/icon in center
-        ctx.fillStyle = 'rgba(255,200,0,0.3)';
-        ctx.font = '50px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('★', 64, 66);
-
-        // Shine
-        ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.beginPath();
-        ctx.arc(45, 40, 20, 0, Math.PI * 2);
-        ctx.fill();
-
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
-    }
 
     // ========== DISPOSE HELPER ==========
     function disposeObject(obj) {
@@ -359,47 +90,28 @@
     function initScene() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 80, 200);
+        scene.fog = new THREE.Fog(0x87CEEB, 60, 120);
 
-        camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
-        camera.position.set(0, 6, 8);
-        camera.lookAt(0, 0, -10);
+        camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+        camera.position.set(0, 5, 7);
+        camera.lookAt(0, 0, -8);
 
-        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.2;
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
         document.body.appendChild(renderer.domElement);
 
-        // Lighting
-        ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+        ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
         scene.add(ambientLight);
 
-        const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x3a5a2a, 0.6);
-        scene.add(hemisphereLight);
+        const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3a5a2a, 0.5);
+        scene.add(hemiLight);
 
-        directionLight = new THREE.DirectionalLight(0xffeedd, 1.2);
-        directionLight.position.set(20, 30, 10);
-        directionLight.castShadow = true;
-        directionLight.shadow.mapSize.width = 2048;
-        directionLight.shadow.mapSize.height = 2048;
-        directionLight.shadow.camera.near = 0.5;
-        directionLight.shadow.camera.far = 100;
-        directionLight.shadow.camera.left = -20;
-        directionLight.shadow.camera.right = 20;
-        directionLight.shadow.camera.top = 20;
-        directionLight.shadow.camera.bottom = -20;
-        scene.add(directionLight);
-
-        const fillLight = new THREE.DirectionalLight(0x8888ff, 0.3);
-        fillLight.position.set(-15, 10, -10);
-        scene.add(fillLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(10, 20, 5);
+        scene.add(dirLight);
 
         clock = new THREE.Clock();
-
         window.addEventListener('resize', onResize);
     }
 
@@ -416,64 +128,41 @@
         player = new THREE.Group();
         player.position.set(0, 0, 0);
 
-        const bodyGeo = new THREE.BoxGeometry(0.6, 0.7, 0.4);
         const bodyMat = new THREE.MeshLambertMaterial({ color: 0x2255aa });
-        playerBody = new THREE.Mesh(bodyGeo, bodyMat);
+        playerBody = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.4), bodyMat);
         playerBody.position.y = 0.7;
-        playerBody.castShadow = true;
         player.add(playerBody);
 
-        // Head
-        const headGeo = new THREE.SphereGeometry(0.2, 8, 8);
         const headMat = new THREE.MeshLambertMaterial({ color: 0xffccaa });
-        playerHead = new THREE.Mesh(headGeo, headMat);
+        playerHead = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 6), headMat);
         playerHead.position.set(0, 1.15, 0);
-        playerHead.castShadow = true;
         player.add(playerHead);
 
-        // Beanie/cap
-        const capGeo = new THREE.CylinderGeometry(0.22, 0.25, 0.1, 8);
         const capMat = new THREE.MeshLambertMaterial({ color: 0xcc3333 });
-        const cap = new THREE.Mesh(capGeo, capMat);
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 0.1, 6), capMat);
         cap.position.set(0, 1.3, 0);
-        cap.rotation.x = 0.1;
         player.add(cap);
 
-        const brimGeo = new THREE.BoxGeometry(0.32, 0.03, 0.2);
-        const brimMat = new THREE.MeshLambertMaterial({ color: 0xcc3333 });
-        const brim = new THREE.Mesh(brimGeo, brimMat);
-        brim.position.set(0, 1.32, 0.18);
-        brim.rotation.x = 0.2;
-        player.add(brim);
-
-        // Left arm
-        const armGeo = new THREE.BoxGeometry(0.12, 0.35, 0.12);
         const armMat = new THREE.MeshLambertMaterial({ color: 0xffccaa });
-        playerLeftArm = new THREE.Mesh(armGeo, armMat);
+        playerLeftArm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.35, 0.12), armMat);
         playerLeftArm.position.set(-0.4, 0.85, 0);
         player.add(playerLeftArm);
-
-        // Right arm
-        playerRightArm = new THREE.Mesh(armGeo.clone(), armMat);
+        playerRightArm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.35, 0.12), armMat);
         playerRightArm.position.set(0.4, 0.85, 0);
         player.add(playerRightArm);
 
-        // Left leg
-        const legGeo = new THREE.BoxGeometry(0.15, 0.3, 0.15);
         const legMat = new THREE.MeshLambertMaterial({ color: 0x224488 });
-        playerLeftLeg = new THREE.Mesh(legGeo, legMat);
+        playerLeftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, 0.15), legMat);
         playerLeftLeg.position.set(-0.15, 0.2, 0);
         player.add(playerLeftLeg);
-
-        // Right leg
-        playerRightLeg = new THREE.Mesh(legGeo.clone(), legMat);
+        playerRightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, 0.15), legMat);
         playerRightLeg.position.set(0.15, 0.2, 0);
         player.add(playerRightLeg);
 
-        // Backpack
-        const packGeo = new THREE.BoxGeometry(0.4, 0.45, 0.2);
-        const packMat = new THREE.MeshLambertMaterial({ color: 0xcc6622 });
-        const pack = new THREE.Mesh(packGeo, packMat);
+        const pack = new THREE.Mesh(
+            new THREE.BoxGeometry(0.4, 0.45, 0.2),
+            new THREE.MeshLambertMaterial({ color: 0xcc6622 })
+        );
         pack.position.set(0, 0.8, -0.3);
         player.add(pack);
 
@@ -487,53 +176,24 @@
         group.position.z = zPos;
 
         // Ground
-        const groundGeo = new THREE.BoxGeometry(GROUND_WIDTH, 0.2, TRACK_SEGMENT_LENGTH);
-        if (!groundMaterial) {
-            groundMaterial = new THREE.MeshLambertMaterial({ map: generateGroundTexture() });
-        }
-        const ground = new THREE.Mesh(groundGeo, groundMaterial);
+        const groundMat = new THREE.MeshBasicMaterial({ color: 0x4a4a4e });
+        const ground = new THREE.Mesh(new THREE.BoxGeometry(GROUND_WIDTH, 0.2, TRACK_SEGMENT_LENGTH), groundMat);
         ground.position.y = -0.1;
-        ground.receiveShadow = true;
-        ground.castShadow = true;
         group.add(ground);
 
-        // Rails (decorative on sides)
-        if (!railMaterial) {
-            railMaterial = new THREE.MeshLambertMaterial({ map: generateRailTexture() });
-        }
-        const railGeo = new THREE.BoxGeometry(0.15, 0.2, TRACK_SEGMENT_LENGTH - 1);
-
-        // Left rail area
-        const railMat2 = new THREE.MeshLambertMaterial({ color: 0x7a7a8a });
-        for (let side = -1; side <= 1; side += 2) {
-            const railSide = new THREE.Mesh(railGeo, railMat2);
-            railSide.position.set(side * (GROUND_WIDTH / 2 - 0.4), 0.05, 0);
-            railSide.receiveShadow = true;
-            group.add(railSide);
-
-            // Sleepers
-            const sleeperGeo = new THREE.BoxGeometry(0.8, 0.05, 0.15);
-            if (!sleeperMaterial) {
-                sleeperMaterial = new THREE.MeshLambertMaterial({ color: 0x5a3a20 });
-            }
-            for (let i = -TRACK_SEGMENT_LENGTH/2; i < TRACK_SEGMENT_LENGTH/2; i += 1.8) {
-                const sleeper = new THREE.Mesh(sleeperGeo, sleeperMaterial);
-                sleeper.position.set(side * (GROUND_WIDTH / 2 - 0.4), -0.02, i);
-                sleeper.receiveShadow = true;
-                group.add(sleeper);
-            }
+        // Lane markings
+        const markMat = new THREE.MeshBasicMaterial({ color: 0x6a6a6e });
+        for (let lane = -1; lane <= 1; lane += 2) {
+            const mark = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.01, TRACK_SEGMENT_LENGTH - 2), markMat);
+            mark.position.set(lane * (LANE_WIDTH / 2), 0.01, 0);
+            group.add(mark);
         }
 
-        // Side walls / curbs
-        const curbMat = new THREE.MeshLambertMaterial({ color: 0x5a5a5a });
+        // Side curbs
+        const curbMat = new THREE.MeshBasicMaterial({ color: 0x5a5a5a });
         for (let side = -1; side <= 1; side += 2) {
-            const curb = new THREE.Mesh(
-                new THREE.BoxGeometry(0.15, 0.3, TRACK_SEGMENT_LENGTH),
-                curbMat
-            );
+            const curb = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, TRACK_SEGMENT_LENGTH), curbMat);
             curb.position.set(side * (GROUND_WIDTH / 2 + 0.25), 0.1, 0);
-            curb.receiveShadow = true;
-            curb.castShadow = true;
             group.add(curb);
         }
 
@@ -542,26 +202,15 @@
 
     // ========== BUILDINGS ==========
     function createBuilding(x, z) {
-        const height = 3 + Math.random() * 8;
-        const width = 1.8 + Math.random() * 1.5;
-        const depth = 1.8 + Math.random() * 1.5;
-        const variant = Math.floor(Math.random() * 6);
-
-        const mat = new THREE.MeshLambertMaterial({ map: generateBuildingTexture(variant) });
-        const geo = new THREE.BoxGeometry(width, height, depth);
-        const building = new THREE.Mesh(geo, mat);
+        const colors = [0x8B7355, 0x6B8E8B, 0x9B8B6B, 0x7B6B5B, 0x5B7B6B, 0x8B7B5B];
+        const height = 3 + Math.random() * 6;
+        const w = 1.5 + Math.random();
+        const d = 1.5 + Math.random();
+        const building = new THREE.Mesh(
+            new THREE.BoxGeometry(w, height, d),
+            new THREE.MeshLambertMaterial({ color: colors[Math.floor(Math.random() * colors.length)] })
+        );
         building.position.set(x, height / 2, z);
-        building.castShadow = true;
-        building.receiveShadow = true;
-
-        // Roof details
-        const roofMat = new THREE.MeshLambertMaterial({
-            color: new THREE.Color().setHSL(0.08 + Math.random() * 0.05, 0.1, 0.25)
-        });
-        const roof = new THREE.Mesh(new THREE.BoxGeometry(width + 0.1, 0.1, depth + 0.1), roofMat);
-        roof.position.y = height;
-        building.add(roof);
-
         scene.add(building);
         return building;
     }
@@ -570,46 +219,21 @@
     function createTrain(lane, zPos) {
         const group = new THREE.Group();
         const laneX = LANE_POSITIONS[lane];
+        const trainColors = [0xcc3333, 0x3366cc, 0x33aa55, 0xcc8833];
 
-        // Train body - main car
-        const bodyMat = new THREE.MeshLambertMaterial({ map: generateTrainTexture() });
-        const bodyGeo = new THREE.BoxGeometry(2.4, 1.8, 6);
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(2.4, 1.8, 6),
+            new THREE.MeshLambertMaterial({ color: trainColors[Math.floor(Math.random() * trainColors.length)] })
+        );
         body.position.set(0, 0.9, 0);
-        body.castShadow = true;
-        body.receiveShadow = true;
         group.add(body);
 
-        // Roof
-        const roofMat = new THREE.MeshLambertMaterial({ color: 0xd0d0d0 });
-        const roof = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, 5.8), roofMat);
-        roof.position.set(0, 1.85, 0);
-        group.add(roof);
-
-        // Bottom frame / wheels area
-        const frameMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
-        const frame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.2, 5.6), frameMat);
-        frame.position.set(0, 0.1, 0);
-        group.add(frame);
-
-        // Wheels
-        const wheelMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
-        for (let side = -1; side <= 1; side += 2) {
-            for (let wx = -1; wx <= 1; wx += 2) {
-                const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 8), wheelMat);
-                wheel.rotation.z = Math.PI / 2;
-                wheel.position.set(side * 1.1, 0.15, wx * 2.2);
-                group.add(wheel);
-            }
-        }
-
-        // Headlights
-        const lightMat = new THREE.MeshLambertMaterial({ color: 0xffffaa });
-        for (let side = -1; side <= 1; side += 2) {
-            const light = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), lightMat);
-            light.position.set(side * 0.8, 0.6, 3.1);
-            group.add(light);
-        }
+        const stripe = new THREE.Mesh(
+            new THREE.BoxGeometry(2.0, 0.05, 5.6),
+            new THREE.MeshBasicMaterial({ color: 0xcccccc })
+        );
+        stripe.position.set(0, 1.85, 0);
+        group.add(stripe);
 
         group.position.set(laneX, 0, zPos);
         group.userData = { type: 'train', lane: lane, width: 2.0, height: 1.8, depth: 5.5 };
@@ -620,31 +244,19 @@
         const group = new THREE.Group();
         const laneX = LANE_POSITIONS[lane];
 
-        const colors = [0xcc6622, 0xdd8833, 0xbb5522, 0xcc7744];
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        const mat = new THREE.MeshLambertMaterial({ color: color });
-
-        // Barrier body
-        const geo = new THREE.BoxGeometry(1.6, 0.6, 1.0);
-        const barrier = new THREE.Mesh(geo, mat);
+        const barrier = new THREE.Mesh(
+            new THREE.BoxGeometry(1.6, 0.6, 1.0),
+            new THREE.MeshLambertMaterial({ color: 0xff6600 })
+        );
         barrier.position.set(0, 0.3, 0);
-        barrier.castShadow = true;
-        barrier.receiveShadow = true;
         group.add(barrier);
 
-        // Reflective stripes
-        const stripeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-        const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.05, 0.9), stripeMat);
+        const stripe = new THREE.Mesh(
+            new THREE.BoxGeometry(1.5, 0.05, 0.9),
+            new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
         stripe.position.set(0, 0.5, 0);
         group.add(stripe);
-
-        // Warning pattern (small triangles - simplified as boxes)
-        const warnMat = new THREE.MeshLambertMaterial({ color: 0xffcc00 });
-        for (let side = -1; side <= 1; side += 2) {
-            const warn = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.4, 0.08), warnMat);
-            warn.position.set(side * 0.6, 0.25, 0.55);
-            group.add(warn);
-        }
 
         group.position.set(laneX, 0, zPos);
         group.userData = { type: 'barrier', lane: lane, width: 1.6, height: 0.6, depth: 1.0 };
@@ -655,42 +267,24 @@
         const group = new THREE.Group();
         const laneX = LANE_POSITIONS[lane];
 
-        // Train body - raised to create gap underneath
-        const bodyMat = new THREE.MeshLambertMaterial({ map: generateTrainTexture() });
-        const bodyGeo = new THREE.BoxGeometry(2.4, 1.2, 6);
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.set(0, 1.4, 0);
-        body.castShadow = true;
-        body.receiveShadow = true;
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(2.4, 1.0, 6),
+            new THREE.MeshLambertMaterial({ color: 0x885533 })
+        );
+        body.position.set(0, 1.5, 0);
         group.add(body);
 
-        // Roof
-        const roofMat = new THREE.MeshLambertMaterial({ color: 0xd0d0d0 });
-        const roof = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, 5.8), roofMat);
-        roof.position.set(0, 2.0, 0);
-        group.add(roof);
-
-        // Side walls (but open bottom)
-        const sideMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
+        const pillarMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
         for (let side = -1; side <= 1; side += 2) {
-            const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 5.6), sideMat);
-            sideWall.position.set(side * 1.2, 1.2, 0);
-            group.add(sideWall);
-        }
-
-        // Wheels
-        const wheelMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
-        for (let side = -1; side <= 1; side += 2) {
-            for (let wx = -1; wx <= 1; wx += 2) {
-                const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 8), wheelMat);
-                wheel.rotation.z = Math.PI / 2;
-                wheel.position.set(side * 1.0, 0.65, wx * 2.0);
-                group.add(wheel);
+            for (let end = -1; end <= 1; end += 2) {
+                const p = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.8, 0.15), pillarMat);
+                p.position.set(side * 1.15, 0.65, end * 2.7);
+                group.add(p);
             }
         }
 
         group.position.set(laneX, 0, zPos);
-        group.userData = { type: 'roll_under', lane: lane, width: 2.0, height: 0.9, depth: 5.5, rollThreshold: 0.5 };
+        group.userData = { type: 'roll_under', lane: lane, width: 2.0, height: 0.6, depth: 5.5 };
         return group;
     }
 
@@ -698,31 +292,13 @@
     function createCoin(lane, zPos, yOffset) {
         const group = new THREE.Group();
         const laneX = LANE_POSITIONS[lane];
-
-        const coinMat = new THREE.MeshStandardMaterial({
-            map: generateCoinTexture(),
-            metalness: 0.7,
-            roughness: 0.3,
-            emissive: 0x442200,
-            emissiveIntensity: 0.1
-        });
-        const coin = new THREE.Mesh(new THREE.CylinderGeometry(COIN_RADIUS, COIN_RADIUS, 0.08, 12), coinMat);
+        const coin = new THREE.Mesh(
+            new THREE.CylinderGeometry(COIN_RADIUS, COIN_RADIUS, 0.08, 8),
+            new THREE.MeshBasicMaterial({ color: 0xffd700 })
+        );
         coin.rotation.x = Math.PI / 2;
         coin.position.set(0, 0.6 + (yOffset || 0), 0);
-        coin.castShadow = true;
         group.add(coin);
-
-        // Glow halo
-        const glowMat = new THREE.MeshBasicMaterial({
-            color: 0xffd700,
-            transparent: true,
-            opacity: 0.15
-        });
-        const glow = new THREE.Mesh(new THREE.RingGeometry(COIN_RADIUS * 0.8, COIN_RADIUS * 1.3, 12), glowMat);
-        glow.rotation.x = Math.PI / 2;
-        glow.position.set(0, 0.6 + (yOffset || 0), 0);
-        group.add(glow);
-
         group.position.set(laneX, 0, zPos);
         group.userData = { lane: lane, collected: false };
         return group;
@@ -730,85 +306,54 @@
 
     function createCoinPattern(lane, zPos, pattern) {
         const coins = [];
-        const patterns = {
-            line: () => {
-                for (let i = 0; i < 5; i++) {
-                    coins.push(createCoin(lane, zPos - i * 2.5, Math.sin(i * 0.8) * 0.3));
-                }
-            },
-            arc: () => {
-                for (let i = 0; i < 7; i++) {
-                    const angle = (i / 6) * Math.PI;
-                    const l = Math.max(0, Math.min(2, lane + Math.round(Math.sin(angle * 2) * 1.5)));
-                    coins.push(createCoin(l, zPos - i * 2, 0.4));
-                }
-            },
-            double: () => {
-                for (let i = 0; i < 4; i++) {
-                    coins.push(createCoin(lane, zPos - i * 2, 0.3));
-                    const sideLane = Math.max(0, Math.min(2, lane + (i % 2 === 0 ? 1 : -1)));
-                    coins.push(createCoin(sideLane, zPos - i * 2, 0.1));
-                }
-            },
-            single: () => {
-                coins.push(createCoin(lane, zPos, 0.3));
-            }
-        };
-
-        const fn = patterns[pattern] || patterns.single;
+        const fn = {
+            line: () => { for (let i = 0; i < 4; i++) coins.push(createCoin(lane, zPos - i * 2.5, 0.2)); },
+            arc: () => { for (let i = 0; i < 5; i++) {
+                const l = Math.max(0, Math.min(2, lane + (i % 3 === 0 ? 1 : i % 3 === 1 ? -1 : 0)));
+                coins.push(createCoin(l, zPos - i * 2, 0.3));
+            }},
+            double: () => { for (let i = 0; i < 3; i++) {
+                coins.push(createCoin(lane, zPos - i * 2, 0.2));
+                coins.push(createCoin(Math.max(0, Math.min(2, lane + (i % 2 === 0 ? 1 : -1))), zPos - i * 2, 0.0));
+            }},
+            single: () => { coins.push(createCoin(lane, zPos, 0.2)); }
+        }[pattern] || fn.single;
         fn();
         return coins;
     }
 
     // ========== PARTICLES ==========
     function createCoinParticles(position) {
-        const colors = [0xffd700, 0xffaa00, 0xffee00];
-        for (let i = 0; i < 12; i++) {
-            const size = 0.05 + Math.random() * 0.08;
-            const mat = new THREE.MeshBasicMaterial({
-                color: colors[Math.floor(Math.random() * colors.length)],
-                transparent: true,
-                opacity: 1
-            });
-            const particle = new THREE.Mesh(new THREE.SphereGeometry(size, 4, 4), mat);
-            particle.position.copy(position);
-            particle.userData = {
-                vx: (Math.random() - 0.5) * 0.3,
-                vy: Math.random() * 0.2 + 0.1,
-                vz: (Math.random() - 0.5) * 0.3,
-                life: 1.0,
-                decay: 0.015 + Math.random() * 0.02,
-                type: 'coin'
-            };
-            scene.add(particle);
-            state.particles.push(particle);
+        for (let i = 0; i < 5; i++) {
+            const p = new THREE.Mesh(
+                new THREE.SphereGeometry(0.05, 4, 4),
+                new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 1 })
+            );
+            p.position.copy(position);
+            p.userData = { vx: (Math.random() - 0.5) * 0.3, vy: Math.random() * 0.2 + 0.1, vz: (Math.random() - 0.5) * 0.3, life: 1.0, decay: 0.025 };
+            scene.add(p);
+            state.particles.push(p);
         }
     }
 
     function createCrashParticles(position) {
-        const colors = [0xff4444, 0xff8800, 0xffcc00, 0xffffff];
-        for (let i = 0; i < 25; i++) {
-            const size = 0.05 + Math.random() * 0.12;
-            const mat = new THREE.MeshBasicMaterial({
-                color: colors[Math.floor(Math.random() * colors.length)],
-                transparent: true,
-                opacity: 1
-            });
-            const particle = new THREE.Mesh(new THREE.SphereGeometry(size, 4, 4), mat);
-            particle.position.copy(position);
-            const speed = 0.2 + Math.random() * 0.4;
+        for (let i = 0; i < 10; i++) {
+            const p = new THREE.Mesh(
+                new THREE.BoxGeometry(0.06, 0.06, 0.06),
+                new THREE.MeshBasicMaterial({ color: [0xff4444, 0xff8800, 0xffcc00][Math.floor(Math.random() * 3)], transparent: true, opacity: 1 })
+            );
+            p.position.copy(position);
+            const speed = 0.15 + Math.random() * 0.2;
             const theta = Math.random() * Math.PI * 2;
-            const phi = Math.random() * Math.PI * 2;
-            particle.userData = {
-                vx: Math.cos(theta) * Math.sin(phi) * speed,
-                vy: Math.random() * 0.3 + 0.2,
-                vz: Math.sin(theta) * Math.sin(phi) * speed,
-                life: 1.0,
-                decay: 0.008 + Math.random() * 0.015,
-                type: 'crash'
+            const phi = Math.random() * Math.PI;
+            p.userData = {
+                vx: Math.sin(phi) * Math.cos(theta) * speed,
+                vy: Math.sin(phi) * Math.sin(theta) * speed + 0.1,
+                vz: Math.cos(phi) * speed,
+                life: 1.0, decay: 0.02
             };
-            scene.add(particle);
-            state.particles.push(particle);
+            scene.add(p);
+            state.particles.push(p);
         }
     }
 
