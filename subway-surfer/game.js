@@ -55,7 +55,8 @@
         startLaneX: 0,
         bestScore: parseInt(localStorage.getItem('subwayBest') || '0'),
         onRoof: false,
-        rollEndTime: 0
+        rollEndTime: 0,
+        firstPerson: false
     };
 
     // ========== THREE.JS SETUP ==========
@@ -836,6 +837,15 @@
         pauseBtnEl.style.display = 'none';
         uiOverlay.appendChild(pauseBtnEl);
         
+        // ===== FPV TOGGLE BUTTON =====
+        const fpvBtn = document.createElement('div');
+        fpvBtn.id = 'fpv-btn';
+        fpvBtn.textContent = '\uD83D\uDC41';
+        fpvBtn.style.display = 'none';
+        uiOverlay.appendChild(fpvBtn);
+        fpvBtn.addEventListener('click', () => { state.firstPerson = !state.firstPerson; fpvBtn.textContent = state.firstPerson ? '\uD83D\uDC41' : '\uD83D\uDC41'; });
+        fpvBtn.addEventListener('touchend', (e) => { e.preventDefault(); state.firstPerson = !state.firstPerson; });
+        
         // ===== MOBILE CONTROLS (cross layout at center bottom) =====
         const mobileCtrl = document.createElement('div');
         mobileCtrl.id = 'mobile-controls';
@@ -1258,6 +1268,8 @@
         pauseBtnEl.style.display = 'block';
         if (!audioCtx) initAudio();
         clock.getDelta();
+        const f = document.getElementById('fpv-btn');
+        if (f) f.style.display = 'block';
     }
 
     function togglePause() {
@@ -1658,28 +1670,35 @@
     function updateCamera() {
         if (!player || !camera) return;
         
-        // Clamp player position to prevent NaN wiping the render
         if (isNaN(player.position.x)) player.position.x = 0;
         if (isNaN(player.position.y)) player.position.y = PLAYER_Y;
         if (isNaN(player.position.z)) player.position.z = 0;
 
-        // Camera follows player directly, centered on their lane
-        const targetX = player.position.x;
-        const targetY = state.isRolling ? 5 : 5.5;
-        const targetZ = player.position.z + 7;
-
-        let shakeX = 0, shakeY = 0;
-        if (state.cameraShake > 0.01) {
-            shakeX = (Math.random() - 0.5) * state.cameraShake * 0.3;
-            shakeY = (Math.random() - 0.5) * state.cameraShake * 0.3;
+        if (state.firstPerson) {
+            // First person: camera at player's eye level, looking forward
+            const eyeY = (state.isRolling ? 0.5 : 1.6);
+            const eyeZ = player.position.z + 0.5;
+            camera.position.set(player.position.x, eyeY, eyeZ);
+            camera.lookAt(player.position.x, 0.8, player.position.z - 30);
+            // Hide player model
+            if (player) player.visible = false;
+        } else {
+            // Third person: camera behind and above
+            const targetX = player.position.x;
+            const targetY = state.isRolling ? 5 : 5.5;
+            const targetZ = player.position.z + 7;
+            let shakeX = 0, shakeY = 0;
+            if (state.cameraShake > 0.01) {
+                shakeX = (Math.random() - 0.5) * state.cameraShake * 0.3;
+                shakeY = (Math.random() - 0.5) * state.cameraShake * 0.3;
+            }
+            camera.position.x += (targetX + shakeX - camera.position.x) * 0.1;
+            camera.position.y += (targetY + shakeY - camera.position.y) * 0.1;
+            camera.position.z += (targetZ - camera.position.z) * 0.1;
+            camera.lookAt(player.position.x, 0, player.position.z - 10);
+            // Show player model
+            if (player) player.visible = true;
         }
-
-        // Smooth follow
-        camera.position.x += (targetX + shakeX - camera.position.x) * 0.1;
-        camera.position.y += (targetY + shakeY - camera.position.y) * 0.1;
-        camera.position.z += (targetZ - camera.position.z) * 0.1;
-
-        camera.lookAt(player.position.x, 0, player.position.z - 10);
     }
 
     // ========== RENDER LOOP ==========
