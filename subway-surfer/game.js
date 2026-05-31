@@ -995,32 +995,74 @@
         // Score display
         const scoreDiv = document.createElement('div');
         scoreDiv.id = 'score-display';
-        scoreDiv.innerHTML = '<span class="coins-label">🪙 <span id="coin-count">0</span></span> &nbsp;|&nbsp; <span class="dist-label">🏃 <span id="distance-count">0</span>m</span>';
+        const coinsSpan = document.createElement('span');
+        coinsSpan.className = 'coins-label';
+        coinsSpan.textContent = '🪙 ';
+        const coinCount = document.createElement('span');
+        coinCount.id = 'coin-count';
+        coinCount.textContent = '0';
+        coinsSpan.appendChild(coinCount);
+        const sep = document.createTextNode('  |  ');
+        const distSpan = document.createElement('span');
+        distSpan.className = 'dist-label';
+        distSpan.textContent = '🏃 ';
+        const distCount = document.createElement('span');
+        distCount.id = 'distance-count';
+        distCount.textContent = '0';
+        distSpan.appendChild(distCount);
+        const mSpan = document.createTextNode('m');
+        scoreDiv.appendChild(coinsSpan);
+        scoreDiv.appendChild(sep);
+        scoreDiv.appendChild(distSpan);
+        scoreDiv.appendChild(mSpan);
         uiOverlay.appendChild(scoreDiv);
-        scoreEl = document.getElementById('distance-count');
-        coinsEl = document.getElementById('coin-count');
+        scoreEl = distCount;
+        coinsEl = coinCount;
 
         // Speed indicator
         const speedDiv = document.createElement('div');
         speedDiv.id = 'speed-indicator';
         speedDiv.textContent = 'SPD: 1x';
-        speedDiv.id = 'speed-indicator';
         uiOverlay.appendChild(speedDiv);
 
-        // Game over screen
+        // Game over screen - build with DOM to avoid getElementById issues
         const gameOverDiv = document.createElement('div');
         gameOverDiv.id = 'game-over-screen';
-        gameOverDiv.innerHTML = `
-            <h1>GAME OVER</h1>
-            <div class="final-score">Distance: <span id="final-distance">0</span>m</div>
-            <div class="final-coins">Coins: <span id="final-coins">0</span></div>
-            <div class="restart-btn" id="restart-btn">TAP TO RETRY</div>
-        `;
+        
+        const h1 = document.createElement('h1');
+        h1.textContent = 'GAME OVER';
+        gameOverDiv.appendChild(h1);
+        
+        const finalScoreDiv = document.createElement('div');
+        finalScoreDiv.className = 'final-score';
+        finalScoreDiv.textContent = 'Distance: ';
+        const finalDistSpan = document.createElement('span');
+        finalDistSpan.id = 'final-distance';
+        finalDistSpan.textContent = '0';
+        finalScoreDiv.appendChild(finalDistSpan);
+        finalScoreDiv.appendChild(document.createTextNode('m'));
+        gameOverDiv.appendChild(finalScoreDiv);
+        
+        const finalCoinsDiv = document.createElement('div');
+        finalCoinsDiv.className = 'final-coins';
+        finalCoinsDiv.textContent = 'Coins: ';
+        const finalCoinSpan = document.createElement('span');
+        finalCoinSpan.id = 'final-coins';
+        finalCoinSpan.textContent = '0';
+        finalCoinsDiv.appendChild(finalCoinSpan);
+        gameOverDiv.appendChild(finalCoinsDiv);
+        
+        const restartBtn = document.createElement('div');
+        restartBtn.className = 'restart-btn';
+        restartBtn.id = 'restart-btn';
+        restartBtn.textContent = 'TAP TO RETRY';
+        gameOverDiv.appendChild(restartBtn);
+        
         uiOverlay.appendChild(gameOverDiv);
         gameOverEl = gameOverDiv;
-        finalScoreEl = document.getElementById('final-distance');
-        finalCoinsEl = document.getElementById('final-coins');
-        restartBtnEl = document.getElementById('restart-btn');
+        finalScoreEl = finalDistSpan;
+        finalCoinsEl = finalCoinSpan;
+        restartBtnEl = restartBtn;
 
         // Instructions
         const instrDiv = document.createElement('div');
@@ -1036,7 +1078,7 @@
 
         document.body.appendChild(uiOverlay);
 
-        // Restart button
+        // Restart button - now it's in the DOM
         restartBtnEl.addEventListener('click', restartGame);
         restartBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); restartGame(); });
     }
@@ -1547,10 +1589,37 @@
 
     // ========== RENDER LOOP ==========
     function animate() {
-        requestAnimationFrame(animate);
-        update();
-        renderer.render(scene, camera);
+        try {
+            update();
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        } catch(e) {}
     }
+    
+    // Use setInterval as fallback for headless environments
+    let animInterval = null;
+    function startAnimationLoop() {
+        if (animInterval) clearInterval(animInterval);
+        animInterval = setInterval(animate, 1000/30);
+    }
+    
+    // Keep RAF for normal browsers, but switch to interval if RAF doesn't fire
+    function animateWithRAF() {
+        rafActive = true;
+        requestAnimationFrame(animateWithRAF);
+        animate();
+    }
+    
+    // RAF timeout fallback: if no animation happens in 2 seconds, switch to interval
+    let rafActive = false;
+    function rafFallback() {
+        if (!rafActive) {
+            console.log('RAF fallback: switching to setInterval');
+            startAnimationLoop();
+        }
+    }
+    setTimeout(rafFallback, 2000);
 
     // ========== INIT ==========
     function init() {
@@ -1570,7 +1639,9 @@
         if (scoreEl) scoreEl.textContent = '0';
         if (coinsEl) coinsEl.textContent = '0';
 
-        animate();
+        animateWithRAF();
+        // Expose for headless testing
+        window.__neoGame = { state, animate, update, restartGame, renderer, scene, camera };
     }
 
     // Start when DOM ready
