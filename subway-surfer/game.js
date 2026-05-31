@@ -1264,12 +1264,17 @@
         // Keyboard
         document.addEventListener('keydown', (e) => {
             keys[e.key] = e.key;
+            
+            // Start game from menu with Space or Enter
+            if (!state.started && (e.key === ' ' || e.key === 'Enter')) {
+                startGameFromMenu();
+                return;
+            }
 
             // Handle Escape/P for pause regardless of game state
             if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
                 if (state.started && !state.gameOver) {
                     togglePause();
-                    // Don't let the escape trigger anything else
                     return;
                 }
             }
@@ -1777,6 +1782,11 @@
 
         // Camera follow
         updateCamera();
+        
+        // Render the scene - MUST call every frame
+        if (renderer && scene && camera) {
+            renderer.render(scene, camera);
+        }
     }
 
     function easeOutQuad(t) {
