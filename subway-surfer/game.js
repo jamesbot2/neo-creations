@@ -15,7 +15,7 @@
     const SPAWN_AHEAD = 200;
     const DESPAWN_BEHIND = 30;
     const GRAVITY = -0.012;
-    const JUMP_VELOCITY = 0.25;
+    const JUMP_VELOCITY = 0.19;
     const PLAYER_Y = 0.15;
     const ROLL_HEIGHT = 0;
     const COIN_RADIUS = 0.35;
@@ -52,7 +52,8 @@
         hasStartedTouch: false,
         started: false,
         paused: false,
-        startLaneX: 0
+        startLaneX: 0,
+        bestScore: parseInt(localStorage.getItem('subwayBest') || '0')
     };
 
     // ========== THREE.JS SETUP ==========
@@ -611,7 +612,7 @@
         if (state.obstacles.length === 0) {
             // Initial: scatter one per lane with big gaps
             // Pattern: each obstacle blocks 1 lane, player dodges to other 2
-            const positions = [-40, -65, -90];
+            const positions = [-30, -50, -70, -90, -110];
             const laneOrder = [0, 1, 2];
             for (let i = 0; i < positions.length; i++) {
                 const lane = laneOrder[i % 3];
@@ -627,7 +628,7 @@
                 spawnCoinsNearObstacle(obs, lane, z);
             }
             // Coins in the safe zone
-            for (let z = -5; z > -35; z -= 5) {
+            for (let z = -5; z > -28; z -= 5) {
                 const coin = createCoin(Math.floor(Math.random() * 3), z, 0.3);
                 scene.add(coin);
                 state.coinObjects.push(coin);
@@ -641,11 +642,11 @@
             if (o.position.z < farthestZ) farthestZ = o.position.z;
         }
         // Spawn one new obstacle when the farthest has moved close (past -45)
-        if (farthestZ > -45) {
+        if (farthestZ > -35) {
             // Check which lanes are blocked near the spawn area
             const busy = new Set();
             for (const o of state.obstacles) {
-                if (o.position.z > -55 && o.position.z < 10) {
+                if (o.position.z > -50 && o.position.z < 10) {
                     const l = Math.round((o.position.x + LANE_WIDTH) / LANE_WIDTH);
                     if (l >= 0 && l <= 2) busy.add(l);
                 }
@@ -763,6 +764,13 @@
         scoreDiv.appendChild(sep);
         scoreDiv.appendChild(distSpan);
         scoreDiv.appendChild(mSpan);
+        
+        // Best score on HUD
+        const bestSmall = document.createElement('div');
+        bestSmall.style.cssText = 'font-size:13px;color:rgba(136,204,255,0.6);margin-top:4px;';
+        bestSmall.textContent = 'BEST: ' + state.bestScore + 'm';
+        scoreDiv.appendChild(bestSmall);
+        
         uiOverlay.appendChild(scoreDiv);
         scoreEl = distCount;
         coinsEl = coinCount;
@@ -799,6 +807,15 @@
         finalCoinSpan.textContent = '0';
         finalCoinsDiv.appendChild(finalCoinSpan);
         gameOverDiv.appendChild(finalCoinsDiv);
+        
+        // Best score
+        const bestDiv = document.createElement('div');
+        bestDiv.id = 'best-score';
+        bestDiv.className = 'final-coins';
+        bestDiv.style.marginBottom = '20px';
+        bestDiv.style.color = '#88ccff';
+        bestDiv.textContent = 'BEST: ' + state.bestScore + 'm';
+        gameOverDiv.appendChild(bestDiv);
         
         const restartBtn = document.createElement('div');
         restartBtn.className = 'restart-btn';
@@ -1217,9 +1234,17 @@
         createCrashParticles(player.position.clone());
         playCrashSound();
 
-        finalScoreEl.textContent = Math.floor(state.score);
+        const score = Math.floor(state.score);
+        if (score > state.bestScore) {
+            state.bestScore = score;
+            try { localStorage.setItem('subwayBest', String(score)); } catch(e) {}
+        }
+        finalScoreEl.textContent = score;
         finalCoinsEl.textContent = state.coins;
         gameOverEl.classList.add('visible');
+        // Show best score
+        const bestEl = document.getElementById('best-score');
+        if (bestEl) bestEl.textContent = 'BEST: ' + state.bestScore + 'm';
         pauseBtnEl.style.display = 'none';
     }
 
