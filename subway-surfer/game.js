@@ -1073,26 +1073,29 @@
     }
 
     function jump() {
-        if (!state.isJumping && !state.isRolling) {
+        if (!state.isJumping) {
             state.isJumping = true;
+            // If was rolling, cancel the roll on jump
+            if (state.isRolling) {
+                state.isRolling = false;
+                state.targetPlayerHeight = PLAYER_Y;
+            }
             state.jumpVelocity = JUMP_VELOCITY;
             playJumpSound();
         }
     }
 
     function roll() {
-        if (!state.isJumping && !state.isRolling) {
-            state.isRolling = true;
-            state.targetPlayerHeight = ROLL_HEIGHT;
-            playRollSound();
-            // Auto end roll after short time
-            setTimeout(() => {
-                if (state.isRolling) {
-                    state.isRolling = false;
-                    state.targetPlayerHeight = PLAYER_Y;
-                }
-            }, 500);
-        }
+        if (state.isRolling) return; // already rolling
+        state.isRolling = true;
+        state.targetPlayerHeight = ROLL_HEIGHT;
+        playRollSound();
+        setTimeout(() => {
+            if (state.isRolling) {
+                state.isRolling = false;
+                state.targetPlayerHeight = PLAYER_Y;
+            }
+        }, 500);
     }
 
     // ========== COLLISION DETECTION ==========
@@ -1436,8 +1439,9 @@
             }
         }
 
-        // Roll height
-        if (state.isRolling) {
+        // Roll height - tuck in air, slide on ground
+        if (state.isRolling && !state.isJumping) {
+            // On ground: apply squash
             state.playerHeight += (state.targetPlayerHeight - state.playerHeight) * 0.2;
             if (Math.abs(state.playerHeight - state.targetPlayerHeight) < 0.01) {
                 state.playerHeight = state.targetPlayerHeight;
@@ -1452,16 +1456,16 @@
         // Apply player height
         player.position.y = state.playerHeight;
 
-        // Scale for roll
+        // Scale for roll (visual squash - even in air)
         if (state.isRolling) {
             const scaleY = (ROLL_HEIGHT + 0.2) / (PLAYER_Y + 0.2);
             player.scale.y = 1 - (1 - scaleY) * 0.7;
-            player.position.y = state.playerHeight;
+            if (!state.isJumping) player.position.y = state.playerHeight;
         } else {
             player.scale.y += (1 - player.scale.y) * 0.15;
         }
 
-        // Running animation - skip during roll
+        // Running animation - skip during roll or jump
         const runCycle = state.gameTime * 8;
         if (!state.isJumping && !state.isRolling) {
             const bobAmount = 0.04;
