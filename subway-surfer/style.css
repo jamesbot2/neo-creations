@@ -343,3 +343,30 @@ canvas {
 .diff-btn[data-diff="0"].active { background: rgba(76,175,80,0.3); border-color: #4CAF50; color: #81C784; }
 .diff-btn[data-diff="1"].active { background: rgba(255,193,7,0.3); border-color: #FFC107; color: #FFD54F; }
 .diff-btn[data-diff="2"].active { background: rgba(244,67,54,0.3); border-color: #F44336; color: #EF9A9A; }
+
+
+/* ===== DEV CONSOLE ===== */
+#dev-console {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    background: rgba(0,0,0,0.85);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    padding: 8px;
+    width: 300px;
+    pointer-events: auto;
+}
+#dev-console input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: #0f0;
+    font-family: monospace;
+    font-size: 16px;
+    outline: none;
+    padding: 4px;
+}
+#dev-console input::placeholder { color: rgba(0,255,0,0.3); }

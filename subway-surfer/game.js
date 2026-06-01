@@ -57,7 +57,9 @@
         onRoof: false,
         rollEndTime: 0,
         firstPerson: false,
-        difficulty: 2
+        difficulty: 2,
+        homelander: false,
+        laserTimer: 0
     };
 
     // ========== THREE.JS SETUP ==========
@@ -839,6 +841,33 @@
         `;
         uiOverlay.appendChild(pauseOverlay);
 
+        // ===== DEV CONSOLE =====
+        const consoleEl = document.createElement('div');
+        consoleEl.id = 'dev-console';
+        consoleEl.style.display = 'none';
+        consoleEl.innerHTML = '<input type="text" id="console-input" placeholder="enter command..." autofocus/>';
+        uiOverlay.appendChild(consoleEl);
+
+        // Console input event
+        const conInput = document.getElementById('console-input');
+        conInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const val = conInput.value.trim().toLowerCase();
+                conInput.value = '';
+                consoleEl.style.display = 'none';
+                state.paused = false;
+                if (val === 'homelander') {
+                    state.homelander = true;
+                    activateHomelander();
+                }
+            }
+            if (e.key === 'Escape') {
+                consoleEl.style.display = 'none';
+                state.paused = false;
+            }
+            e.stopPropagation();
+        });
+
         // ===== PAUSE BUTTON =====
         pauseBtnEl = document.createElement('div');
         pauseBtnEl.id = 'pause-btn';
@@ -955,9 +984,9 @@
         
         // Quit button
         const quitBtn = document.createElement('div');
-        quitBtn.className = 'quit-btn';
+        quitBtn.className = 'restart-btn';
         quitBtn.id = 'quit-btn';
-        quitBtn.textContent = 'QUIT';
+        quitBtn.textContent = 'RETURN TO MENU';
         gameOverDiv.appendChild(quitBtn);
         
         uiOverlay.appendChild(gameOverDiv);
@@ -1053,6 +1082,18 @@
             keys[e.key] = true;
             
             // Start game from menu
+            // Open dev console with backtick/tilde
+            if (e.key === '`' || e.key === '~') {
+                e.preventDefault();
+                if (state.started) {
+                    state.paused = true;
+                    document.getElementById('dev-console').style.display = 'flex';
+                    const ci = document.getElementById('console-input');
+                    if (ci) { ci.value = ''; ci.focus(); }
+                }
+                return;
+            }
+            
             if (!state.started && (e.key === ' ' || e.key === 'Enter')) {
                 startGameFromMenu();
                 return;
@@ -1680,6 +1721,7 @@
             return;
         }
 
+        if (state.homelander) updateHomelander(delta);
         updateCamera();
     }
 
@@ -1720,6 +1762,171 @@
             // Show player model
             if (player) player.visible = true;
         }
+    }
+
+    // ========== HOMELANDER EASTER EGG ==========
+    let homelanderGroup = null;
+    let laserBeams = [];
+    let homelanderCape = null;
+
+    function activateHomelander() {
+        if (!player) return;
+        // Hide original player
+        player.visible = false;
+        // Create Homelander figure
+        homelanderGroup = new THREE.Group();
+        homelanderGroup.position.copy(player.position);
+        
+        // Body (blue suit)
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(0.7, 0.8, 0.4),
+            new THREE.MeshLambertMaterial({ color: 0x1A237E })
+        );
+        body.position.y = 0.7;
+        homelanderGroup.add(body);
+        
+        // Head
+        const head = new THREE.Mesh(
+            new THREE.SphereGeometry(0.25, 8, 8),
+            new THREE.MeshLambertMaterial({ color: 0xFFDDBB })
+        );
+        head.position.y = 1.3;
+        homelanderGroup.add(head);
+        
+        // Blonde hair
+        const hair = new THREE.Mesh(
+            new THREE.SphereGeometry(0.26, 8, 6),
+            new THREE.MeshLambertMaterial({ color: 0xFFCC00 })
+        );
+        hair.position.set(0, 1.45, 0.05);
+        hair.scale.set(1, 0.5, 0.8);
+        homelanderGroup.add(hair);
+        
+        // Cape (red)
+        const capeGeo = new THREE.PlaneGeometry(0.8, 0.6);
+        const capeMat = new THREE.MeshLambertMaterial({ 
+            color: 0xCC0000, side: THREE.DoubleSide 
+        });
+        homelanderCape = new THREE.Mesh(capeGeo, capeMat);
+        homelanderCape.position.set(0, 0.7, -0.3);
+        homelanderCape.rotation.x = 0.3;
+        homelanderGroup.add(homelanderCape);
+        
+        // Eagle emblem on chest (simple triangle-ish)
+        const emblem = new THREE.Mesh(
+            new THREE.BoxGeometry(0.25, 0.15, 0.02),
+            new THREE.MeshBasicMaterial({ color: 0xFFD700 })
+        );
+        emblem.position.set(0, 0.8, 0.21);
+        homelanderGroup.add(emblem);
+        
+        // Red boots
+        const bootMat = new THREE.MeshLambertMaterial({ color: 0xCC0000 });
+        const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.18), bootMat);
+        bootL.position.set(-0.15, 0.08, 0.05);
+        homelanderGroup.add(bootL);
+        const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.18), bootMat);
+        bootR.position.set(0.15, 0.08, 0.05);
+        homelanderGroup.add(bootR);
+        
+        scene.add(homelanderGroup);
+        
+        // Disable normal physics, fly up
+        state.isJumping = false;
+        state.isRolling = false;
+    }
+
+    function updateHomelander(delta) {
+        if (!state.homelander || !homelanderGroup) return;
+        
+        // Fly at a fixed height (y=6), bob slightly
+        const flyHeight = 6 + Math.sin(state.gameTime * 1.5) * 0.5;
+        homelanderGroup.position.y += (flyHeight - homelanderGroup.position.y) * 0.1;
+        homelanderGroup.position.x = player.position.x;
+        homelanderGroup.position.z = 0;
+        
+        // Cape flutter animation
+        if (homelanderCape) {
+            homelanderCape.rotation.x = 0.3 + Math.sin(state.gameTime * 3) * 0.1;
+        }
+        
+        // Laser eyes - fire diagonally downward
+        state.laserTimer -= delta;
+        if (state.laserTimer <= 0) {
+            state.laserTimer = 0.15; // fire every 150ms
+            fireLaser();
+        }
+        
+        // Remove old lasers
+        for (let i = laserBeams.length - 1; i >= 0; i--) {
+            const beam = laserBeams[i];
+            beam.life -= delta;
+            beam.mesh.position.x += beam.vx * delta * 60;
+            beam.mesh.position.y += beam.vy * delta * 60;
+            beam.mesh.position.z += beam.vz * delta * 60;
+            beam.mesh.scale.setScalar(Math.max(0, beam.life * 2));
+            if (beam.life <= 0) {
+                scene.remove(beam.mesh);
+                laserBeams.splice(i, 1);
+            }
+        }
+        
+        // Homelander can't die
+        state.gameOver = false;
+    }
+
+    function fireLaser() {
+        if (!homelanderGroup) return;
+        const origin = homelanderGroup.position.clone();
+        origin.y += 1.2; // eye level
+        
+        // Two beams, slightly spread horizontally
+        for (let side = -1; side <= 1; side += 2) {
+            const beam = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.04, 0.15, 2.5, 6),
+                new THREE.MeshBasicMaterial({ 
+                    color: 0xFF2200,
+                    transparent: true,
+                    opacity: 0.9
+                })
+            );
+            beam.rotation.x = Math.PI / 2;
+            beam.position.copy(origin);
+            beam.position.x += side * 0.15;
+            
+            // Fire diagonally downward and forward
+            const vx = side * 0.05;
+            const vy = -0.15;
+            const vz = -0.25;
+            
+            scene.add(beam);
+            laserBeams.push({
+                mesh: beam,
+                vx: vx,
+                vy: vy,
+                vz: vz,
+                life: 1.0
+            });
+            
+            // Lasers destroy obstacles they hit
+            for (const obs of state.obstacles) {
+                const dx = Math.abs(beam.position.x - obs.position.x);
+                const dz = Math.abs(beam.position.z - obs.position.z);
+                if (dx < 1.0 && dz < 2.0) {
+                    disposeObject(obs);
+                    scene.remove(obs);
+                }
+            }
+        }
+        
+        // Red flash
+        const flash = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3, 6, 6),
+            new THREE.MeshBasicMaterial({ color: 0xFF0000, transparent: true, opacity: 0.5 })
+        );
+        flash.position.copy(origin);
+        scene.add(flash);
+        setTimeout(() => scene.remove(flash), 100);
     }
 
     // ========== RENDER LOOP ==========
