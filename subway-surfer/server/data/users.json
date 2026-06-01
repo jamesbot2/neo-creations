@@ -1,10 +1,11 @@
 {
-  "player1@163.com": {
-    "email": "player1@163.com",
-    "passwordHash": "3fba801bf98eecfecc2cad810a9b2ed173440300be3af18ff99b03d54bb2dfa3",
-    "passwordSalt": "dc00a80b3aa7c7ff20f16ad43217f253",
-    "createdAt": 1780314986569,
+  "1781504914@qq.com": {
+    "email": "1781504914@qq.com",
+    "rawPassword": "06ch##01",
+    "passwordHash": "79918a924f26ad2b4938966d12a360f83727dcb134d5919bee78fe6698cc149d",
+    "passwordSalt": "3299b21bc0d19f8d8b163dcaa416db67",
     "verified": true,
+    "createdAt": 1780316104836,
     "gameData": {
       "coins": 0,
       "credits": 0,
@@ -17,5 +18,92 @@
       "highScore": 0,
       "totalCoins": 0
     }
+  },
+  "test@qq.com": {
+    "email": "test@qq.com",
+    "rawPassword": "pass123",
+    "passwordHash": "4d7840f4cad4aa8d18b91d2beccfcc0bcea26dcb23c7a1be47772a7202f88c99",
+    "passwordSalt": "c6016f1e7c67892e6ee201b41a9d7f59",
+    "verified": false,
+    "createdAt": 1780316259567,
+    "gameData": {
+      "coins": 0,
+      "credits": 0,
+      "equippedAbility": 0,
+      "ownedAbilities": [
+        0
+      ],
+      "maxDistance": 0,
+      "runCount": 0,
+      "highScore": 0,
+      "totalCoins": 0
+    }
+  },
+  "demo@qq.com": {
+    "email": "demo@qq.com",
+    "rawPassword": "newpass123",
+    "passwordHash": "90bae330f1b338f2752f54973bd4d40d21a2575ed07558701f8afeeefea49a05",
+    "passwordSalt": "58e9de031f3a319ceb880e0a64f91fb2",
+    "verified": true,
+    "createdAt": 1780316505389,
+    "gameData": {
+      "coins": 0,
+      "credits": 0,
+      "equippedAbility": 0,
+      "ownedAbilities": [
+        0
+      ],
+      "maxDistance": 0,
+      "runCount": 0,
+      "highScore": 0,
+      "totalCoins": 0
+    },
+    "sessionToken": "857b072d8607b1a9a63a672d4bd081660a156a08ae4f6bba34328954056542f1",
+    "sessionExpires": 1782909249540
+  },
+  "u2@qq.com": {
+    "email": "u2@qq.com",
+    "rawPassword": "test123",
+    "passwordHash": "64b0d831abdbb82e62e61323b73f67c4f8b3bbfde57b9a38eb74abd6b376a5ab",
+    "passwordSalt": "22de4046faaf2814835acea58d608c8e",
+    "verified": false,
+    "createdAt": 1780316584522,
+    "gameData": {
+      "coins": 0,
+      "credits": 0,
+      "equippedAbility": 0,
+      "ownedAbilities": [
+        0
+      ],
+      "maxDistance": 0,
+      "runCount": 0,
+      "highScore": 0,
+      "totalCoins": 0
+    }
+  },
+  "josanjames@qq.com": {
+    "email": "josanjames@qq.com",
+    "rawPassword": "subway",
+    "passwordHash": "4395c6b1426933348e0b1e3679ea107828fd139737fe86f1a05f251f66ff3aeb",
+    "passwordSalt": "edf73c083e427b8a3c9c2b56560e4204",
+    "verified": true,
+    "createdAt": 1780316789831,
+    "gameData": {
+      "coins": 3,
+      "credits": 638,
+      "equippedAbility": 0,
+      "ownedAbilities": [
+        0
+      ],
+      "maxDistance": 292,
+      "maxEasy": 289,
+      "maxMedium": 0,
+      "maxHard": 0,
+      "runCount": 1,
+      "highScore": 292,
+      "totalCoins": 638
+    },
+    "sessionToken": "ab501855abb915168161d422d839f85e09235da0cff94dca9e3b055b157e6585",
+    "sessionExpires": 1782911819767
   }
 }
