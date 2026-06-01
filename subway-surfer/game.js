@@ -805,6 +805,115 @@
             osc.stop(audioCtx.currentTime + 0.2);
         } catch(e) {}
     }
+    
+    // ========== BACKGROUND MUSIC ==========
+    // Procedural music system - beat tempo increases with game speed
+    var bgMusicState = {
+        running: false,
+        beatInterval: null,
+        lastBeat: 0,
+        beatCount: 0,
+        tempo: 120, // BPM
+        currentOscs: []
+    };
+    
+    function startBgMusic() {
+        if (state.muted || !audioCtx || bgMusicState.running) return;
+        bgMusicState.running = true;
+        bgMusicState.lastBeat = audioCtx.currentTime;
+        bgMusicState.beatCount = 0;
+    }
+    
+    function stopBgMusic() {
+        bgMusicState.running = false;
+        // Stop any lingering oscillators
+        for (const o of bgMusicState.currentOscs) {
+            try { o.stop(); } catch(e) {}
+        }
+        bgMusicState.currentOscs = [];
+    }
+    
+    function updateBgMusic(delta) {
+        if (!bgMusicState.running || !audioCtx || state.muted) return;
+        if (state.paused || !state.started) return;
+        
+        // Map speed to tempo: 1x=100bpm, 50x=200bpm
+        const speedLevel = Math.floor((state.speed - START_SPEED) / (MAX_SPEED - START_SPEED) * 49) + 1;
+        const targetBpm = 100 + Math.min(speedLevel, 50) * 2;
+        bgMusicState.tempo += (targetBpm - bgMusicState.tempo) * 0.01;
+        
+        const beatInterval = 60 / bgMusicState.tempo; // seconds per beat
+        const now = audioCtx.currentTime;
+        
+        if (now - bgMusicState.lastBeat >= beatInterval) {
+            bgMusicState.lastBeat += beatInterval;
+            bgMusicState.beatCount++;
+            const beat = bgMusicState.beatCount;
+            
+            try {
+                // ---- KICK DRUM (every beat, emphasis on 1 and 3) ----
+                if (beat % 2 === 0 || beat % 4 === 1) {
+                    const kick = audioCtx.createOscillator();
+                    const kickGain = audioCtx.createGain();
+                    kick.connect(kickGain);
+                    kickGain.connect(audioCtx.destination);
+                    kick.type = 'sine';
+                    kick.frequency.setValueAtTime(150, now);
+                    kick.frequency.linearRampToValueAtTime(40, now + 0.1);
+                    kickGain.gain.setValueAtTime(0.15, now);
+                    kickGain.gain.linearRampToValueAtTime(0, now + 0.2);
+                    kick.start(now);
+                    kick.stop(now + 0.2);
+                    bgMusicState.currentOscs.push(kick);
+                    setTimeout(() => {
+                        const idx = bgMusicState.currentOscs.indexOf(kick);
+                        if (idx >= 0) bgMusicState.currentOscs.splice(idx, 1);
+                    }, 300);
+                }
+                
+                // ---- HI-HAT (every offbeat, faster at high speed) ----
+                if (state.speed > START_SPEED * 2 || beat % 2 === 0) {
+                    const hatGain = audioCtx.createGain();
+                    hatGain.connect(audioCtx.destination);
+                    // Create a click using short noise-like oscillator
+                    const hat = audioCtx.createOscillator();
+                    hat.connect(hatGain);
+                    hat.type = 'square';
+                    hat.frequency.setValueAtTime(5000, now);
+                    hatGain.gain.setValueAtTime(0.06, now);
+                    hatGain.gain.linearRampToValueAtTime(0, now + 0.04);
+                    hat.start(now);
+                    hat.stop(now + 0.04);
+                    bgMusicState.currentOscs.push(hat);
+                    setTimeout(() => {
+                        const idx = bgMusicState.currentOscs.indexOf(hat);
+                        if (idx >= 0) bgMusicState.currentOscs.splice(idx, 1);
+                    }, 100);
+                }
+                
+                // ---- BASS LINE (every 4 beats) ----
+                if (beat % 4 === 0) {
+                    const bass = audioCtx.createOscillator();
+                    const bassGain = audioCtx.createGain();
+                    bass.connect(bassGain);
+                    bassGain.connect(audioCtx.destination);
+                    bass.type = 'sawtooth';
+                    const notes = [110, 130.8, 110, 146.8]; // A3, C4, A3, D4
+                    const note = notes[Math.floor(beat / 4) % 4];
+                    bass.frequency.setValueAtTime(note, now);
+                    bassGain.gain.setValueAtTime(0.08, now);
+                    bassGain.gain.linearRampToValueAtTime(0, now + 0.3);
+                    bass.start(now);
+                    bass.stop(now + 0.3);
+                    bgMusicState.currentOscs.push(bass);
+                    setTimeout(() => {
+                        const idx = bgMusicState.currentOscs.indexOf(bass);
+                        if (idx >= 0) bgMusicState.currentOscs.splice(idx, 1);
+                    }, 400);
+                }
+            } catch(e) {}
+        }
+    }
 
     // ========== SPAWNING ==========
     function spawnInitialTrack() {
@@ -1542,10 +1651,13 @@
         
         state.isJumping = true;
         // If was rolling: stay squished during the jump, land back in squat
-        // Roll persists so the player visually stays in crouch pose
+        // Jump velocity is higher for roll-jumps (spring-loaded) to compensate for low height
         if (state.isRolling) {
             state.rollEndTime = Date.now() + 99999; // keep rolling indefinitely
             state.targetPlayerHeight = ROLL_HEIGHT;
+            state.jumpVelocity = JUMP_VELOCITY * 1.5; // spring up higher from squat
+            playJumpSound();
+            return;
         }
         // If on a roof, jump off it - keep current height and set jumpingFromRoof
         if (state.onRoof) {
@@ -1756,8 +1868,10 @@
         }
         if (state.muted && audioCtx) {
             try { audioCtx.suspend(); } catch(e) {}
+            stopBgMusic();
         } else if (!state.muted && audioCtx && audioCtx.state === 'suspended') {
             try { audioCtx.resume(); } catch(e) {}
+            if (state.started && !state.gameOver) startBgMusic();
         }
     }
 
@@ -1868,6 +1982,7 @@
 
         gameOverEl.classList.remove('visible');
         pauseOverlay.style.display = 'none';
+        stopBgMusic();
         pauseBtnEl.style.display = 'none';
         menuOverlay.style.display = 'flex';
         updateMenuCredits();
@@ -2290,6 +2405,7 @@
         checkThemeChange();
 
         if (state.homelander) updateHomelander(delta);
+        updateBgMusic(delta);
         updateCamera();
     }
 
