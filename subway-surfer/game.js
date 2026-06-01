@@ -1121,6 +1121,14 @@
             keys[e.key] = true;
             
             // Start game from menu
+            // Homelander direct movement (bypasses the update loop for instant response)
+            if (state.homelander && homelanderGroup) {
+                const hlSpeed = 0.3;
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') homelanderGroup.position.x -= hlSpeed;
+                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') homelanderGroup.position.x += hlSpeed;
+                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') homelanderGroup.position.y = Math.min(20, homelanderGroup.position.y + hlSpeed);
+                if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') homelanderGroup.position.y = Math.max(1, homelanderGroup.position.y - hlSpeed);
+            }
             // Close console with Escape
             if (e.key === 'Escape' && document.getElementById('dev-console')?.style?.display === 'flex') {
                 toggleConsole();
