@@ -153,6 +153,28 @@
         }).catch(function() {});
     };
 
+    SG.loadAccountData = function() {
+        if (!SG.account.loggedIn || !SG.account.token) return;
+        fetch('http://' + window.location.hostname + ':3000/api/load', {
+            headers: { 'Authorization': 'Bearer ' + SG.account.token }
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (!data.gameData) return;
+            var g = data.gameData;
+            SG.state.bestScore = Math.max(SG.state.bestScore || 0, g.maxDistance || 0);
+            SG.state.credits = g.credits || 0;
+            SG.state.totalCoins = g.totalCoins || 0;
+            SG.state.equippedAbility = g.equippedAbility || 0;
+            SG.state.maxEasy = g.maxEasy || 0;
+            SG.state.maxMedium = g.maxMedium || 0;
+            SG.state.maxHard = g.maxHard || 0;
+            SG.state.runCount = g.runCount || 0;
+            var owned = g.ownedAbilities || [0];
+            SG.state.canDoubleJump = owned.indexOf(1) >= 0;
+            SG.state.canJetpack = owned.indexOf(2) >= 0;
+            SG.state.canRoofWalk = owned.indexOf(3) >= 0;
+        }).catch(function(){});
+    };
+
     SG.showProfile = function() {
         var overlay = document.getElementById('profile-overlay');
         if (!overlay) {
@@ -212,6 +234,9 @@
             document.body.innerHTML += '<div style="position:fixed;top:0;left:0;width:100%;background:#ff0000;color:#fff;padding:20px;z-index:9999;font-size:16px;">ERROR: ' + e.message + '<br>' + e.stack.split('\n').slice(0,3).join('<br>') + '</div>';
             return;
         } // Run original init FIRST
+
+        // Load account data from server
+        SG.loadAccountData();
 
         // Wrap setupUI to handle login state
         var origSetup = SG.setupUI;
