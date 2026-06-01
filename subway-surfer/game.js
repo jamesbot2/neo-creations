@@ -1828,67 +1828,132 @@
         // Create Homelander figure
         homelanderGroup = new THREE.Group();
         homelanderGroup.position.copy(player.position);
+        homelanderGroup.position.y = 6;
         
-        // Body (blue suit)
-        const body = new THREE.Mesh(
-            new THREE.BoxGeometry(0.7, 0.8, 0.4),
+        // === BODY ===
+        // Torso (blue suit)
+        const torso = new THREE.Mesh(
+            new THREE.BoxGeometry(0.6, 0.65, 0.35),
             new THREE.MeshLambertMaterial({ color: 0x1A237E })
         );
-        body.position.y = 0.7;
-        homelanderGroup.add(body);
+        torso.position.y = 0.65;
+        homelanderGroup.add(torso);
         
-        // Head
+        // Shoulders
+        const shoulderMat = new THREE.MeshLambertMaterial({ color: 0x1A237E });
+        const shoulder = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.1, 0.35), shoulderMat);
+        shoulder.position.y = 0.95;
+        homelanderGroup.add(shoulder);
+        
+        // === HEAD ===
         const head = new THREE.Mesh(
-            new THREE.SphereGeometry(0.25, 8, 8),
-            new THREE.MeshLambertMaterial({ color: 0xFFDDBB })
+            new THREE.SphereGeometry(0.25, 10, 10),
+            new THREE.MeshLambertMaterial({ color: 0xFFDDCC })
         );
         head.position.y = 1.3;
+        head.scale.set(1, 1.1, 0.9);
         homelanderGroup.add(head);
         
-        // Blonde hair
-        const hair = new THREE.Mesh(
-            new THREE.SphereGeometry(0.26, 8, 6),
-            new THREE.MeshLambertMaterial({ color: 0xFFCC00 })
+        // Jaw line
+        const jaw = new THREE.Mesh(
+            new THREE.BoxGeometry(0.22, 0.08, 0.18),
+            new THREE.MeshLambertMaterial({ color: 0xFFDDCC })
         );
-        hair.position.set(0, 1.45, 0.05);
-        hair.scale.set(1, 0.5, 0.8);
-        homelanderGroup.add(hair);
+        jaw.position.set(0, 1.15, 0.22);
+        homelanderGroup.add(jaw);
         
-        // Cape (red)
-        const capeGeo = new THREE.PlaneGeometry(0.8, 0.6);
+        // Blonde hair (swooping back)
+        const hairMat = new THREE.MeshLambertMaterial({ color: 0xFFCC00 });
+        const hair = new THREE.Mesh(new THREE.SphereGeometry(0.27, 8, 6), hairMat);
+        hair.position.set(0, 1.48, 0.05);
+        hair.scale.set(1, 0.4, 0.7);
+        homelanderGroup.add(hair);
+        // Hair swoop
+        const swoop = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.12), hairMat);
+        swoop.position.set(0, 1.5, -0.1);
+        homelanderGroup.add(swoop);
+        
+        // Glowing red eyes
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xFF2200 });
+        for (let side = -1; side <= 1; side += 2) {
+            const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), eyeMat);
+            eye.position.set(side * 0.08, 1.35, 0.2);
+            homelanderGroup.add(eye);
+        }
+        
+        // === CAPE ===
+        const capeGeo = new THREE.PlaneGeometry(1.0, 0.8);
         const capeMat = new THREE.MeshLambertMaterial({ 
             color: 0xCC0000, side: THREE.DoubleSide 
         });
         homelanderCape = new THREE.Mesh(capeGeo, capeMat);
-        homelanderCape.position.set(0, 0.7, -0.3);
+        homelanderCape.position.set(0, 0.7, -0.22);
         homelanderCape.rotation.x = 0.3;
         homelanderGroup.add(homelanderCape);
         
-        // Eagle emblem on chest (simple triangle-ish)
-        const emblem = new THREE.Mesh(
-            new THREE.BoxGeometry(0.25, 0.15, 0.02),
-            new THREE.MeshBasicMaterial({ color: 0xFFD700 })
-        );
-        emblem.position.set(0, 0.8, 0.21);
+        // === EAGLE EMBLEM on chest ===
+        const emblemMat = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
+        const emblem = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.02), emblemMat);
+        emblem.position.set(0, 0.75, 0.18);
         homelanderGroup.add(emblem);
+        // Eagle wings (small angled boxes)
+        for (let side = -1; side <= 1; side += 2) {
+            const wing = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.02), emblemMat);
+            wing.position.set(side * 0.15, 0.78, 0.18);
+            wing.rotation.z = side * 0.4;
+            homelanderGroup.add(wing);
+        }
         
-        // Red boots
+        // === RED GLOVES ===
+        const gloveMat = new THREE.MeshLambertMaterial({ color: 0xCC0000 });
+        const gloveL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.1), gloveMat);
+        gloveL.position.set(-0.3, 0.35, 0);
+        homelanderGroup.add(gloveL);
+        const gloveR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.1), gloveMat);
+        gloveR.position.set(0.3, 0.35, 0);
+        homelanderGroup.add(gloveR);
+        
+        // Arms
+        const armMat = new THREE.MeshLambertMaterial({ color: 0x1A237E });
+        const armL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.08), armMat);
+        armL.position.set(-0.3, 0.55, 0);
+        homelanderGroup.add(armL);
+        const armR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.08), armMat);
+        armR.position.set(0.3, 0.55, 0);
+        homelanderGroup.add(armR);
+        
+        // === RED BOOTS ===
         const bootMat = new THREE.MeshLambertMaterial({ color: 0xCC0000 });
-        const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.18), bootMat);
-        bootL.position.set(-0.15, 0.08, 0.05);
+        const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.2), bootMat);
+        bootL.position.set(-0.14, 0.06, 0.05);
         homelanderGroup.add(bootL);
-        const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.18), bootMat);
-        bootR.position.set(0.15, 0.08, 0.05);
+        const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.2), bootMat);
+        bootR.position.set(0.14, 0.06, 0.05);
         homelanderGroup.add(bootR);
+        
+        // Legs
+        const legMat = new THREE.MeshLambertMaterial({ color: 0x1A237E });
+        const legL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.25, 0.12), legMat);
+        legL.position.set(-0.14, 0.25, 0);
+        homelanderGroup.add(legL);
+        const legR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.25, 0.12), legMat);
+        legR.position.set(0.14, 0.25, 0);
+        homelanderGroup.add(legR);
+        
+        // Belt
+        const belt = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 0.04, 0.15),
+            new THREE.MeshLambertMaterial({ color: 0x222222 })
+        );
+        belt.position.set(0, 0.35, 0.15);
+        homelanderGroup.add(belt);
         
         scene.add(homelanderGroup);
         
         // Disable normal physics, fly up
         state.isJumping = false;
         state.isRolling = false;
-    }
-
-    function deactivateHomelander() {
+    }    function deactivateHomelander() {
         state.homelander = false;
         if (homelanderGroup) {
             scene.remove(homelanderGroup);
@@ -1907,21 +1972,31 @@
     function updateHomelander(delta) {
         if (!state.homelander || !homelanderGroup) return;
         
-        // Fly at a fixed height (y=6), bob slightly
-        const flyHeight = 6 + Math.sin(state.gameTime * 1.5) * 0.5;
-        homelanderGroup.position.y += (flyHeight - homelanderGroup.position.y) * 0.1;
-        homelanderGroup.position.x = player.position.x;
-        homelanderGroup.position.z = 0;
+        // WASD / Arrow keys to fly
+        const speed = 0.15;
+        if (keys['ArrowUp'] || keys['w'] || keys['W']) homelanderGroup.position.y += speed * delta * 60;
+        if (keys['ArrowDown'] || keys['s'] || keys['S']) homelanderGroup.position.y -= speed * delta * 60;
+        if (keys['ArrowLeft'] || keys['a'] || keys['A']) homelanderGroup.position.x -= speed * delta * 60;
+        if (keys['ArrowRight'] || keys['d'] || keys['D']) homelanderGroup.position.x += speed * delta * 60;
+        
+        // Float down slowly if not pressing anything
+        if (!keys['ArrowUp'] && !keys['w'] && !keys['W'] && !keys['ArrowDown'] && !keys['s'] && !keys['S']) {
+            homelanderGroup.position.y += Math.sin(state.gameTime * 1.5) * 0.008;
+        }
+        
+        // Clamp Y (not too high/low)
+        if (homelanderGroup.position.y < 1) homelanderGroup.position.y = 1;
+        if (homelanderGroup.position.y > 20) homelanderGroup.position.y = 20;
         
         // Cape flutter animation
         if (homelanderCape) {
-            homelanderCape.rotation.x = 0.3 + Math.sin(state.gameTime * 3) * 0.1;
+            homelanderCape.rotation.x = 0.3 + Math.sin(state.gameTime * 3) * 0.15;
         }
         
-        // Laser eyes - fire diagonally downward
+        // Laser eyes - fire diagonally downward (slower when moving vertically)
         state.laserTimer -= delta;
         if (state.laserTimer <= 0) {
-            state.laserTimer = 0.15; // fire every 150ms
+            state.laserTimer = 0.15;
             fireLaser();
         }
         
@@ -1939,6 +2014,8 @@
             }
         }
         
+        // Invincible
+        state.gameOver = false;
     }
 
     function fireLaser() {
