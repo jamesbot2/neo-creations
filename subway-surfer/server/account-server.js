@@ -177,13 +177,14 @@ async function handleRequest(req, res) {
             h += '<td><input id="coins-' + u.email.replace(/[^a-zA-Z0-9]/g,'_') + '" type="number" value="' + (g.coins||0) + '" style="width:70px;padding:4px;font-size:12px">';
             h += '<button class="btn btn-edit" onclick="setCoins(\'' + u.email + '\')" style="font-size:11px;padding:2px 6px">Set</button></td>';
             h += '<td><button class="btn btn-edit" data-email="' + u.email + '">Edit PW</button> ';
-            h += '<button class="btn btn-del" data-email="' + u.email + '">Delete</button></td></tr>';
+            h += '<button class="btn" style="background:#4CAF50;" data-email="' + u.email + '" data-action="verify">Verify</button> ';
+            h += '<button class="btn btn-del" data-email="' + u.email + '" data-action="delete">Delete</button></td></tr>';
         }
         h += '</table><script>';
         h += 'document.addEventListener("click",function(e){';
         h += 'var btn=e.target.closest("[data-email]");if(!btn)return;';
         h += 'var email=btn.getAttribute("data-email");';
-        h += 'if(btn.classList.contains("btn-del")){';
+        h += 'if(btn.getAttribute("data-action")==="verify"){fetch("/api/admin-verify-user",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email})}).then(function(r){return r.json()}).then(function(d){document.getElementById("msg").textContent=(d.message||d.error||"").replace(/<[^>]*>/g,"");if(!d.error)setTimeout(function(){location.reload()},500)})}if(btn.getAttribute("data-action")==="delete"){';
         h += 'if(!confirm("Delete "+email+"?"))return;';
         h += 'fetch("/api/admin-delete-user",{method:"POST",headers:{"Content-Type":"application/json"},';
         h += 'body:JSON.stringify({email:email})}).then(function(r){return r.json()}).then(function(d){';
@@ -457,6 +458,20 @@ h += '</script></body></html>';
         saveUsers(users);
         console.log('[ADMIN] Set coins for ' + email + ': ' + gd.coins);
         sendJSON(res, 200, { message: email + ' coins set to ' + gd.coins });
+        return;
+    }
+
+    // ---- ADMIN: VERIFY USER ----
+    if (pathname === '/api/admin-verify-user' && method === 'POST') {
+        const body = await parseBody(req);
+        const { email } = body;
+        if (!email) { sendJSON(res, 400, { error: 'Email required' }); return; }
+        const users = getUsers();
+        if (!users[email]) { sendJSON(res, 404, { error: 'User not found' }); return; }
+        users[email].verified = true;
+        saveUsers(users);
+        console.log('[ADMIN] Verified user: ' + email);
+        sendJSON(res, 200, { message: 'Verified: ' + email });
         return;
     }
 
