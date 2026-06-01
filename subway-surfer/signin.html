@@ -151,13 +151,13 @@ function doRegister() {
     body: JSON.stringify({ email: email, password: pass })
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.error) { setMsg('reg-msg', data.error, 'error'); return; }
-    // Show code verification
+    // Auto-fill code from server response
     document.getElementById('code-email').textContent = email;
+    if (data.code) document.getElementById('code-input').value = data.code;
     document.getElementById('form-register').className = 'hidden';
     document.getElementById('form-code').className = '';
-    document.getElementById('code-input').value = '';
     document.getElementById('code-input').focus();
-    setMsg('code-msg', 'Check server console for code', 'info');
+    setMsg('code-msg', 'Code: ' + (data.code || 'check server'), 'info');
     setMsg('reg-msg', '', '');
   }).catch(function() { setMsg('reg-msg', 'Server error', 'error'); });
 }

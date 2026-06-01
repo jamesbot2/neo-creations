@@ -177,7 +177,7 @@ async function handleRequest(req, res) {
         console.log('Code:  ' + code);
         console.log('=========================\n');
 
-        sendJSON(res, 201, { message: 'Verification code sent to your email', email });
+        sendJSON(res, 201, { message: 'Verification code: ' + code, email, code: code });
         return;
     }
 
