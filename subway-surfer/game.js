@@ -84,6 +84,63 @@
 
     // ========== TEXTURE GENERATION ==========
 
+    // Create US flag texture for Homelander cape
+    function createUSFlagTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        
+        // Stripes: 13 alternating red and white
+        const stripeH = canvas.height / 13;
+        for (let i = 0; i < 13; i++) {
+            ctx.fillStyle = (i % 2 === 0) ? '#B22234' : '#FFFFFF';
+            ctx.fillRect(0, i * stripeH, canvas.width, stripeH + 1);
+        }
+        
+        // Canton (blue field)
+        const cantonW = canvas.width * 0.38;
+        const cantonH = stripeH * 7;
+        ctx.fillStyle = '#3C3B6E';
+        ctx.fillRect(0, 0, cantonW, cantonH);
+        
+        // Stars: 50 white stars in 9 rows (alternating 6 and 5)
+        ctx.fillStyle = '#FFFFFF';
+        const starRows = 9;
+        const starColsEven = 6;
+        const starColsOdd = 5;
+        const starSpacingX = cantonW / (starColsEven + 1);
+        const starSpacingY = cantonH / (starRows + 1);
+        const starSize = 2.5;
+        
+        for (let row = 0; row < starRows; row++) {
+            const cols = (row % 2 === 0) ? starColsEven : starColsOdd;
+            const offsetX = (row % 2 === 0) ? 0 : starSpacingX / 2;
+            for (let col = 0; col < cols; col++) {
+                const cx = (col + 1) * starSpacingX + offsetX;
+                const cy = (row + 1) * starSpacingY;
+                // Draw a 5-pointed star
+                ctx.beginPath();
+                for (let i = 0; i < 5; i++) {
+                    const outerAngle = (i * 72 - 90) * Math.PI / 180;
+                    const innerAngle = ((i * 72) + 36 - 90) * Math.PI / 180;
+                    if (i === 0) {
+                        ctx.moveTo(cx + Math.cos(outerAngle) * starSize, cy + Math.sin(outerAngle) * starSize);
+                    } else {
+                        ctx.lineTo(cx + Math.cos(outerAngle) * starSize, cy + Math.sin(outerAngle) * starSize);
+                    }
+                    ctx.lineTo(cx + Math.cos(innerAngle) * starSize * 0.4, cy + Math.sin(innerAngle) * starSize * 0.4);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        return texture;
+    }
+
 
 
 
@@ -1088,7 +1145,7 @@
         
         // Quit button
         const quitBtn = document.createElement('div');
-        quitBtn.className = 'restart-btn';
+        quitBtn.className = 'menu-btn';
         quitBtn.id = 'quit-btn';
         quitBtn.textContent = 'RETURN TO MENU';
         gameOverDiv.appendChild(quitBtn);
@@ -1138,9 +1195,22 @@
             btn.addEventListener('touchend', (e) => { e.preventDefault(); setDiff(); });
         });
         
-        // Pause overlay click to resume
-        pauseOverlay.addEventListener('click', togglePause);
-        pauseOverlay.addEventListener('touchend', (e) => { e.preventDefault(); togglePause(); });
+        // Pause overlay click to resume (with dedicated tap target)
+        const pauseTapBtn = pauseOverlay.querySelector('.tap-to-start');
+        if (pauseTapBtn) {
+            pauseTapBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePause(); });
+            pauseTapBtn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); togglePause(); });
+        }
+        pauseOverlay.addEventListener('click', (e) => {
+            // Resume on overlay click but not on menu button clicks
+            if (e.target.closest('.menu-btn')) return;
+            if (e.target === pauseOverlay) togglePause();
+        });
+        pauseOverlay.addEventListener('touchend', (e) => {
+            if (e.target.closest('.menu-btn')) return;
+            e.preventDefault();
+            if (e.target === pauseOverlay) togglePause();
+        });
         
         // Pause button click
         pauseBtnEl.addEventListener('click', togglePause);
@@ -2090,15 +2160,47 @@
             homelanderGroup.add(eye);
         }
         
-        // === CAPE ===
-        const capeGeo = new THREE.PlaneGeometry(1.0, 0.8);
+        // === CAPE with US Flag ===
+        // Generate US flag texture
+        const flagTex = createUSFlagTexture();
+        
+        // Main cape - uses curved plane segments for a draped look
+        const capeGeo = new THREE.BoxGeometry(1.1, 0.85, 0.02);
         const capeMat = new THREE.MeshLambertMaterial({ 
-            color: 0xCC0000, side: THREE.DoubleSide 
+            map: flagTex,
+            side: THREE.DoubleSide
         });
         homelanderCape = new THREE.Mesh(capeGeo, capeMat);
-        homelanderCape.position.set(0, 0.7, -0.22);
-        homelanderCape.rotation.x = 0.3;
+        // Position: starts from shoulders (y=0.95), draping down to mid-thigh
+        homelanderCape.position.set(0, 0.62, -0.18);
+        homelanderCape.rotation.x = 0.25;
         homelanderGroup.add(homelanderCape);
+        
+        // Cape clasp/knot at the neck (where cape connects to shoulders)
+        const claspMat = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
+        const clasp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.04, 6), claspMat);
+        clasp.position.set(0, 0.97, -0.13);
+        clasp.rotation.x = 0.5;
+        homelanderGroup.add(clasp);
+        
+        // Two small gold buttons at the connection point
+        for (let side = -1; side <= 1; side += 2) {
+            const btn = new THREE.Mesh(
+                new THREE.CircleGeometry(0.04, 6),
+                new THREE.MeshBasicMaterial({ color: 0xFFD700 })
+            );
+            btn.position.set(side * 0.12, 0.95, -0.14);
+            homelanderGroup.add(btn);
+        }
+        
+        // Backing cape layer (slightly larger, darker for depth)
+        const backCape = new THREE.Mesh(
+            new THREE.BoxGeometry(1.15, 0.88, 0.01),
+            new THREE.MeshLambertMaterial({ color: 0x550000, side: THREE.DoubleSide })
+        );
+        backCape.position.set(0, 0.62, -0.195);
+        backCape.rotation.x = 0.25;
+        homelanderGroup.add(backCape);
         
         // === EAGLE EMBLEM on chest ===
         const emblemMat = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
@@ -2167,7 +2269,15 @@
     }    function deactivateHomelander() {
         state.homelander = false;
         if (homelanderGroup) {
+            // Dispose cape texture
+            if (homelanderCape && homelanderCape.material) {
+                if (homelanderCape.material.map) {
+                    homelanderCape.material.map.dispose();
+                }
+                homelanderCape.material.dispose();
+            }
             scene.remove(homelanderGroup);
+            disposeObject(homelanderGroup);
             homelanderGroup = null;
         }
         // Clean up lasers
@@ -2201,7 +2311,9 @@
         
         // Cape flutter animation
         if (homelanderCape) {
-            homelanderCape.rotation.x = 0.3 + Math.sin(state.gameTime * 3) * 0.15;
+            homelanderCape.rotation.x = 0.25 + Math.sin(state.gameTime * 3) * 0.15;
+            // Subtle side sway
+            homelanderCape.rotation.z = Math.sin(state.gameTime * 2.5) * 0.05;
         }
         
         // Laser eyes - fire diagonally downward (slower when moving vertically)
