@@ -58,6 +58,7 @@ input:focus{border-color:#ff6600}
 
   <!-- REGISTER -->
   <div id="register-form" class="hidden">
+    <input id="reg-name" type="text" placeholder="Username (2-16 chars)" maxlength="16">
     <input id="reg-email" type="email" placeholder="Email">
     <input id="reg-pass" type="password" placeholder="Password (6+ chars)">
     <div id="captcha-img"></div>
@@ -143,17 +144,19 @@ function doLogin() {
 }
 
 function doRegister() {
+  var name = document.getElementById('reg-name').value.trim();
   var email = document.getElementById('reg-email').value.trim();
   var password = document.getElementById('reg-pass').value;
   var cap = document.getElementById('captcha').value.trim();
-  if (!email || !password) { msg('reg-msg', 'Fill in all fields', 'error'); return; }
+  if (!name || !email || !password) { msg('reg-msg', 'Fill in all fields', 'error'); return; }
+  if (name.length < 2 || name.length > 16) { msg('reg-msg', 'Username 2-16 chars', 'error'); return; }
   if (password.length < 6) { msg('reg-msg', 'Password needs 6+ characters', 'error'); return; }
   if (!cap) { msg('reg-msg', 'Enter captcha code', 'error'); return; }
 
   fetch(API + '/api/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email, password: password, captchaId: captchaId, captchaAnswer: cap })
+    body: JSON.stringify({ email: email, password: password, username: name, captchaId: captchaId, captchaAnswer: cap })
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.error) { msg('reg-msg', data.error, 'error'); loadCaptcha(); return; }
     document.getElementById('verify-email').textContent = email;

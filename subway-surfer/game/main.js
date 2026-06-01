@@ -199,6 +199,12 @@
             SG.state.bestScore = score;
             try { localStorage.setItem('subwayBest', String(score)); } catch(e) {}
         }
+        // Per-difficulty max distance
+        var diff = SG.state.difficulty;
+        var diffKey = ['maxEasy','maxMedium','maxHard'][diff] || 'maxHard';
+        if (score > (SG.state[diffKey] || 0)) {
+            SG.state[diffKey] = score;
+        }
         SG.finalScoreEl.textContent = score;
         SG.finalCoinsEl.textContent = SG.state.coins;
 

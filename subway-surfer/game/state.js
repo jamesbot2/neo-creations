@@ -63,6 +63,9 @@
         policeSiren: false,
         policeTotalDistance: 0,
         maxLegitDistance: 0,
+        maxEasy: 0,
+        maxMedium: 0,
+        maxHard: 0,
         legitRun: true,
         runCount: 0
     };

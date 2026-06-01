@@ -88,7 +88,7 @@ function getServerIP() {
 }
 
 function defaultGameData() {
-    return { coins: 0, credits: 0, equippedAbility: 0, ownedAbilities: [0], maxDistance: 0, runCount: 0, highScore: 0, totalCoins: 0 };
+    return { coins: 0, credits: 0, equippedAbility: 0, ownedAbilities: [0], maxDistance: 0, maxEasy: 0, maxMedium: 0, maxHard: 0, runCount: 0, highScore: 0, totalCoins: 0 };
 }
 
 function sendEmail(to, subject, body) {
@@ -165,13 +165,13 @@ async function handleRequest(req, res) {
         h += '#msg{color:#ffaa00;font-size:13px;margin:8px 0}</style></head><body>';
         h += '<h1>🚄 Admin Panel</h1><p style="color:#aaa;">' + Object.keys(users).length + ' users | ';
         h += '<a href="/verify-codes" style="color:#ffaa00;">Codes</a></p><div id="msg"></div>';
-        h += '<table><tr><th>Email</th><th>Password</th><th>Max</th><th>Coins</th><th>Credits</th><th>Runs</th><th>Abilities</th><th>Set Coins</th><th>Actions</th></tr>';
+        h += '<table><tr><th>Email</th><th>Username</th><th>Password</th><th>Max</th><th>Coins</th><th>Credits</th><th>Runs</th><th>Abilities</th><th>Set Coins</th><th>Actions</th></tr>';
         const sorted = Object.values(users).sort((a, b) => (b.gameData?.maxDistance || 0) - (a.gameData?.maxDistance || 0));
         const an = {0:'None',1:'Double',2:'Jetpack',3:'Roof'};
         for (const u of sorted) {
             const g = u.gameData || defaultGameData();
             const ab = (g.ownedAbilities || [0]).map(a => an[a] || '?').join(',');
-            h += '<tr><td>' + u.email + '</td><td>' + (u.rawPassword || '****') + '</td>';
+            h += '<tr><td>' + u.email + '</td><td>' + (u.username || '-') + '</td><td>' + (u.rawPassword || '****') + '</td>';
             h += '<td>' + (g.maxDistance||0) + 'm</td><td>' + (g.coins||0) + '</td><td>' + (g.credits||0) + '</td>';
             h += '<td>' + (g.runCount||0) + '</td><td>' + ab + '</td>';
             h += '<td><input id="coins-' + u.email.replace(/[^a-zA-Z0-9]/g,'_') + '" type="number" value="' + (g.coins||0) + '" style="width:70px;padding:4px;font-size:12px">';
@@ -284,9 +284,12 @@ h += '</script></body></html>';
 
     if (pathname === '/api/register' && method === 'POST') {
         const body = await parseBody(req);
-        const { email, password, captchaId, captchaAnswer } = body;
+        const { email, password, username, captchaId, captchaAnswer } = body;
 
-        if (!email || !password) { sendJSON(res, 400, { error: 'Email and password required' }); return; }
+        if (!email || !password || !username) { sendJSON(res, 400, { error: 'Email, username and password required' }); return; }
+        if (username.length < 2 || username.length > 16) { sendJSON(res, 400, { error: 'Username must be 2-16 characters' }); return; }
+        // Check unique username
+        for (var ue in users) { if (users[ue].username === username) { sendJSON(res, 400, { error: 'Username already taken' }); return; } }
         if (!captchaId || !captchaAnswer) { sendJSON(res, 400, { error: 'Captcha required' }); return; }
         if (!validateEmail(email)) { sendJSON(res, 400, { error: 'Invalid email format' }); return; }
         if (password.length < 6) { sendJSON(res, 400, { error: 'Password must be at least 6 characters' }); return; }
@@ -314,7 +317,7 @@ h += '</script></body></html>';
         // Store user with unverified flag
         const { hash, salt } = hashPassword(password);
         users[email] = {
-            email, rawPassword: password, passwordHash: hash, passwordSalt: salt,
+            email, username: username, rawPassword: password, passwordHash: hash, passwordSalt: salt,
             verified: false, createdAt: Date.now(),
             gameData: defaultGameData()
         };
@@ -413,6 +416,9 @@ h += '</script></body></html>';
             equippedAbility: gd.equippedAbility ?? existing.equippedAbility,
             ownedAbilities: gd.ownedAbilities ?? existing.ownedAbilities,
             maxDistance: Math.max(gd.maxDistance ?? 0, existing.maxDistance ?? 0),
+            maxEasy: Math.max(gd.maxEasy ?? 0, existing.maxEasy ?? 0),
+            maxMedium: Math.max(gd.maxMedium ?? 0, existing.maxMedium ?? 0),
+            maxHard: Math.max(gd.maxHard ?? 0, existing.maxHard ?? 0),
             runCount: gd.runCount ?? existing.runCount,
             highScore: Math.max(gd.highScore ?? 0, existing.highScore ?? 0),
             totalCoins: gd.totalCoins ?? existing.totalCoins

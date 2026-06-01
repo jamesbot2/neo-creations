@@ -140,6 +140,9 @@
                     equippedAbility: SG.state.equippedAbility || 0,
                     ownedAbilities: owned,
                     maxDistance: SG.state.bestScore || SG.state.maxLegitDistance || 0,
+                    maxEasy: SG.state.maxEasy || 0,
+                    maxMedium: SG.state.maxMedium || 0,
+                    maxHard: SG.state.maxHard || 0,
                     runCount: (SG.state.runCount || 0),
                     highScore: SG.state.bestScore || 0,
                     totalCoins: SG.state.totalCoins || SG.state.coins || 0
