@@ -1121,14 +1121,13 @@
             keys[e.key] = true;
             
             // Start game from menu
-            // Homelander direct movement (instant, no delay)
+            // Homelander direct movement (instant, held key = continuous smooth)
             if (state.homelander && homelanderGroup) {
-                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') homelanderGroup.position.x -= 0.6;
-                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') homelanderGroup.position.x += 0.6;
-                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') homelanderGroup.position.y = Math.min(20, homelanderGroup.position.y + 0.6);
-                if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') homelanderGroup.position.y = Math.max(1, homelanderGroup.position.y - 0.6);
-                e.preventDefault();
-                return; // Stop all further key processing
+                const hlSpeed = 0.25;
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { homelanderGroup.position.x -= hlSpeed; e.preventDefault(); }
+                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { homelanderGroup.position.x += hlSpeed; e.preventDefault(); }
+                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { homelanderGroup.position.y = Math.min(20, homelanderGroup.position.y + hlSpeed); e.preventDefault(); }
+                if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { homelanderGroup.position.y = Math.max(1, homelanderGroup.position.y - hlSpeed); e.preventDefault(); }
             }
             // Escape: close console first, then pause
             if (e.key === 'Escape') {
