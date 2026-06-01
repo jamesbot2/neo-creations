@@ -23,10 +23,15 @@
     const DESPAWN_BEHIND = 30;
     const GRAVITY = -0.012;
     const JUMP_VELOCITY = 0.23;
+    const DOUBLE_JUMP_VELOCITY = 0.20;
     const PLAYER_Y = 0.15;
     const ROLL_HEIGHT = 0;
     const COIN_RADIUS = 0.35;
     const GROUND_WIDTH = LANE_WIDTH * LANE_COUNT + 1;
+    const JETPACK_FUEL_MAX = 30;
+    const JETPACK_COOLDOWN_MAX = 15;
+    const JETPACK_LIFT = 0.04;
+    const ROOF_TOP_Y = 1.8;
 
     // ========== GAME STATE ==========
     const state = {
@@ -69,7 +74,18 @@
         cyberMode: false,
         laserTimer: 0,
         muted: false,
-        lastPlayedCoin: 0
+        lastPlayedCoin: 0,
+        credits: parseInt(localStorage.getItem('subwayCredits') || '0'),
+        totalCoins: parseInt(localStorage.getItem('subwayTotalCoins') || '0'),
+        equippedAbility: 0,
+        canDoubleJump: false,
+        hasDoubleJumped: false,
+        canJetpack: false,
+        jetpackFuel: 0,
+        jetpackCooldown: 0,
+        canRoofWalk: false,
+        theme: 0,
+        jumpingFromRoof: false
     };
 
     // ========== THREE.JS SETUP ==========
@@ -1011,6 +1027,7 @@
                     <button class="diff-btn" data-diff="1">MEDIUM</button>
                     <button class="diff-btn active" data-diff="2">HARD</button>
                 </div>
+                <div id="menu-credits" style="color:#FFD700;font-size:18px;margin:8px 0;">💰 TOTAL: 0</div>
                 <div class="menu-controls">
                     <span class="key">←</span> <span class="key">→</span> Move &nbsp;|&nbsp;
                     <span class="key">↑</span> Jump &nbsp;|&nbsp;
@@ -1018,6 +1035,7 @@
                 </div>
                 <div class="menu-keys">ESC / P = Pause &nbsp;|&nbsp; M = Menu &nbsp;|&nbsp; 👁 FPV</div>
                 <div class="menu-mobile-hint">Swipe to play on mobile</div>
+                <div class="menu-btn" id="shop-btn-menu" style="margin-top:10px;font-size:14px;padding:8px 16px;">🛒 SHOP</div>
             </div>
         `;
         uiOverlay.appendChild(menuOverlay);
@@ -1219,6 +1237,13 @@
             btn.addEventListener('click', setDiff);
             btn.addEventListener('touchend', (e) => { e.preventDefault(); setDiff(); });
         });
+        
+        // Shop button
+        const shopBtnMenu = document.getElementById('shop-btn-menu');
+        if (shopBtnMenu) {
+            shopBtnMenu.addEventListener('click', (e) => { e.stopPropagation(); showShop(); });
+            shopBtnMenu.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); showShop(); });
+        }
         
         // Pause overlay click to resume (with dedicated tap target)
         const pauseTapBtn = pauseOverlay.querySelector('.tap-to-start');
@@ -1489,7 +1514,30 @@
     }
 
     function jump() {
-        if (state.isJumping) return;
+        // If already in air: check abilities
+        if (state.isJumping) {
+            // Jetpack activation: press jump in air when jetpack is equipped and ready
+            if (state.canJetpack && state.jetpackCooldown <= 0 && state.jetpackFuel <= 0) {
+                state.jetpackFuel = JETPACK_FUEL_MAX;
+                state.jumpVelocity = 0;
+                playJumpSound();
+                return;
+            }
+            // Jetpack already active, ignore extra presses
+            if (state.canJetpack && state.jetpackFuel > 0) {
+                return;
+            }
+            // Double jump: if already in air, can double jump
+            if (state.canDoubleJump && !state.hasDoubleJumped) {
+                state.hasDoubleJumped = true;
+                state.jumpVelocity = DOUBLE_JUMP_VELOCITY;
+                state.playerHeight = Math.max(state.playerHeight, 0.5);
+                playJumpSound();
+                return;
+            }
+            return;
+        }
+        
         state.isJumping = true;
         // If was rolling, cancel the roll immediately and jump
         if (state.isRolling) {
@@ -1497,10 +1545,14 @@
             state.targetPlayerHeight = PLAYER_Y;
             player.scale.y += (1 - player.scale.y) * 0.8; // instant unsquish
         }
-        // If on a roof, jump off it immediately
+        // If on a roof, jump off it - keep current height and set jumpingFromRoof
         if (state.onRoof) {
+            state.jumpingFromRoof = true;
             state.onRoof = false;
-            state.playerHeight = PLAYER_Y;
+            // Keep player at roof height, let jump carry them up/away
+            state.jumpVelocity = JUMP_VELOCITY;
+            playJumpSound();
+            return;
         }
         state.jumpVelocity = JUMP_VELOCITY;
         playJumpSound();
@@ -1533,6 +1585,14 @@
             
             // On roof: skip all collisions (ride over everything)
             if (state.onRoof) continue;
+            
+            // Jumping from roof: skip train collisions until clear
+            if (state.jumpingFromRoof && od.type === 'train') {
+                // Only skip if player is still near/above the train
+                if (Math.abs(playerPos.z - obs.position.z) < 4) {
+                    continue;
+                }
+            }
             
             // Train: height=1.8, visual body center at y=0.9
             // Barrier: height=0.6, visual body center at y=0.3
@@ -1601,13 +1661,32 @@
                 continue;
             }
 
-            // AABB collision
+            // AABB calculations
             const dx = Math.abs(playerHitbox.x - obsBox.x);
             const dz = Math.abs(playerHitbox.z - obsBox.z);
             const dy = Math.abs(playerHitbox.y - obsBox.y);
             
             // Z threshold: trains are long, barriers are short
             const zThreshold = (playerHitbox.d + obsBox.d) / 2 + 0.1;
+
+            // Roof Walk ability: if player is above obstacle, walk on top instead of death
+            if (state.canRoofWalk && !state.onRoof) {
+                const obsTop = obsBox.y + obsH / 2;
+                const playerBottom = playerHitbox.y - playerHitbox.h / 2;
+                // Player is above the obstacle top
+                if (playerBottom >= obsTop - 0.1) {
+                    // Only sides/front/back count as death, top is safe
+                    const sideHit = dx < (playerHitbox.w + obsBox.w) / 2 &&
+                                    dz < zThreshold;
+                    if (sideHit && playerBottom >= obsTop - 0.1) {
+                        // Land on top of obstacle
+                        state.onRoof = true;
+                        state.playerHeight = obsTop + 0.1;
+                        continue;
+                    }
+                    continue;
+                }
+            }
 
             if (dx < (playerHitbox.w + obsBox.w) / 2 &&
                 dz < zThreshold &&
@@ -1769,17 +1848,27 @@
         state.cameraShake = 0;
         state.hasStartedTouch = false;
         state.onRoof = false;
+        state.hasDoubleJumped = false;
+        state.jumpingFromRoof = false;
+        state.jetpackFuel = 0;
+        state.jetpackCooldown = 0;
 
         player.position.set(0, 0, 0);
         player.rotation.set(0, 0, 0);
         player.scale.set(1, 1, 1);
         camera.position.set(0, 6, 8);
         camera.lookAt(0, 0, -10);
+        
+        // Reset theme to City
+        if (state.theme !== 0) {
+            switchTheme(0);
+        }
 
         gameOverEl.classList.remove('visible');
         pauseOverlay.style.display = 'none';
         pauseBtnEl.style.display = 'none';
         menuOverlay.style.display = 'flex';
+        updateMenuCredits();
         const muteInMenu = document.getElementById('mute-btn');
         if (muteInMenu) muteInMenu.style.display = 'none';
 
@@ -1813,6 +1902,10 @@
         state.scoreTimer = 0;
         state.cameraShake = 0;
         state.hasStartedTouch = false;
+        state.hasDoubleJumped = false;
+        state.jumpingFromRoof = false;
+        state.jetpackFuel = 0;
+        state.jetpackCooldown = 0;
         
         // Reset player to center lane
         player.position.set(0, PLAYER_Y, 0);
@@ -1829,6 +1922,11 @@
         pauseOverlay.style.display = 'none';
         clock.getDelta();
 
+        // Reset theme to City
+        if (state.theme !== 0) {
+            switchTheme(0);
+        }
+        
         spawnInitialTrack();
         spawnBuildings();
         spawnObstacles();
@@ -1847,6 +1945,27 @@
         }
         finalScoreEl.textContent = score;
         finalCoinsEl.textContent = state.coins;
+        
+        // Convert in-game coins to credits with difficulty multiplier
+        const multipliers = [1, 5, 10];
+        const multiplier = multipliers[state.difficulty] || 1;
+        const earned = state.coins * multiplier;
+        state.credits += earned;
+        state.totalCoins += state.coins;
+        try {
+            localStorage.setItem('subwayCredits', String(state.credits));
+            localStorage.setItem('subwayTotalCoins', String(state.totalCoins));
+        } catch(e) {}
+        saveShopData();
+        
+        // Add earned credits info to game over screen
+        const creditsInfo = document.createElement('div');
+        creditsInfo.className = 'final-coins';
+        creditsInfo.style.color = '#FFD700';
+        creditsInfo.style.fontSize = '14px';
+        creditsInfo.textContent = '+ ' + earned + ' credits (' + multiplier + 'x)';
+        gameOverEl.querySelector('.final-coins').after(creditsInfo);
+        
         gameOverEl.classList.add('visible');
         // Show best score
         const bestEl = document.getElementById('best-score');
@@ -1995,6 +2114,20 @@
             player.position.x = LANE_POSITIONS[state.currentLane];
         }
 
+        // Jetpack: float upward when active
+        if (state.isJumping && state.canJetpack && state.jetpackFuel > 0 && state.jetpackCooldown <= 0) {
+            state.jumpVelocity = 0; // cancel gravity
+            state.playerHeight += JETPACK_LIFT * delta * 60;
+            state.jetpackFuel -= delta;
+            if (state.jetpackFuel <= 0) {
+                state.jetpackFuel = 0;
+                state.jetpackCooldown = JETPACK_COOLDOWN_MAX;
+            }
+        } else if (state.jetpackCooldown > 0) {
+            state.jetpackCooldown -= delta;
+            if (state.jetpackCooldown < 0) state.jetpackCooldown = 0;
+        }
+        
         // Jump physics - roll in air = fall faster
         if (state.isJumping) {
             state.playerHeight += state.jumpVelocity * delta * 60;
@@ -2003,8 +2136,14 @@
             if (state.playerHeight <= PLAYER_Y) {
                 state.playerHeight = PLAYER_Y;
                 state.isJumping = false;
+                state.hasDoubleJumped = false;
+                state.jumpingFromRoof = false;
                 state.jumpVelocity = 0;
                 // Landing while rolling: keep sliding (release down key to stand)
+                // If jetpack was active, start cooldown
+                if (state.canJetpack && state.jetpackFuel <= 0 && state.jetpackCooldown <= 0) {
+                    // Already handled above
+                }
             }
         }
 
@@ -2050,7 +2189,7 @@
         // Roof mechanics: ride on any obstacle roofs, jump between them
         // When jumping, don't force player onto roof (allows jump from rooftops)
         if (state.onRoof && !state.isJumping) {
-            state.playerHeight = 1.8 + PLAYER_Y;
+            state.playerHeight = ROOF_TOP_Y + PLAYER_Y;
             player.position.y = state.playerHeight;
             // Check if there's a surface beneath (train or roll-under)
             const hasSurfaceBelow = state.obstacles.some(o =>
@@ -2060,6 +2199,11 @@
             if (!hasSurfaceBelow) {
                 state.onRoof = false;
             }
+        }
+        
+        // jumpingFromRoof: clear when player is well clear of the train
+        if (state.jumpingFromRoof && !state.isJumping) {
+            state.jumpingFromRoof = false;
         }
 
         // Running animation - skip during roll or jump
@@ -2124,6 +2268,9 @@
             updateCamera();
             return;
         }
+        
+        // Theme change based on score
+        checkThemeChange();
 
         if (state.homelander) updateHomelander(delta);
         updateCamera();
@@ -2331,7 +2478,7 @@
         for (let i = 1; i < 13; i += 2) {
             const yPos = CH/2 - (i + 0.5) * stripeH;
             const s = new THREE.Mesh(new THREE.BoxGeometry(CW - 0.02, stripeH * 0.9, 0.015), whiteMat);
-            s.position.set(0, yPos, 0.01);
+            s.position.set(0, yPos, -0.015);
             capeGroup.add(s);
         }
         
@@ -2340,7 +2487,7 @@
         const cantonH = stripeH * 7;
         const cantonMat = new THREE.MeshBasicMaterial({ color: 0x3C3B6E, side: ds });
         const canton = new THREE.Mesh(new THREE.BoxGeometry(cantonW, cantonH, 0.015), cantonMat);
-        canton.position.set(-CW/2 + cantonW/2, CH/2 - cantonH/2, 0.01);
+        canton.position.set(-CW/2 + cantonW/2, CH/2 - cantonH/2, -0.015);
         capeGroup.add(canton);
         
         // Stars: small white cubes (visible from ALL angles, unlike CircleGeometry)
@@ -2356,7 +2503,7 @@
                 const sx = -CW/2 + (col + 1) * cellW - cellW/2;
                 const sy = CH/2 - (row + 1) * cellH + cellH/2;
                 const star = new THREE.Mesh(starGeo, starMat);
-                star.position.set(sx, sy, 0.02);
+                star.position.set(sx, sy, -0.02);
                 capeGroup.add(star);
             }
         }
@@ -2745,9 +2892,242 @@
         }
     }
 
+    // ========== THEME SYSTEM ==========
+    
+    const THEME_COLORS = [
+        { // 0: City
+            bg: 0x87CEEB,
+            fog: 0x87CEEB,
+            ground: 0x4a4a4e,
+            laneMark: 0x6a6a6e,
+            curb: 0x5a5a5a,
+            buildings: [0x8B7355, 0x6B8E8B, 0x9B8B6B, 0x7B6B5B, 0x5B7B6B, 0x8B7B5B]
+        },
+        { // 1: Forest
+            bg: 0x4CAF50,
+            fog: 0x4CAF50,
+            ground: 0x5D4037,
+            laneMark: 0x6D4C41,
+            curb: 0x4E342E,
+            buildings: [0x5D4037, 0x6A4E37, 0x4C7A3A, 0x3E6B2F, 0x7B6B3B, 0x8B5E3C]
+        },
+        { // 2: Desert
+            bg: 0xE8C170,
+            fog: 0xE8C170,
+            ground: 0xC2A670,
+            laneMark: 0xD4C080,
+            curb: 0xB8956A,
+            buildings: [0xD4A86A, 0xC2956A, 0xB88A5A, 0xC8A878, 0xD8B888, 0xA8884A]
+        },
+        { // 3: Ocean/Arctic
+            bg: 0x1a5276,
+            fog: 0x1a5276,
+            ground: 0x85C1E9,
+            laneMark: 0xAED6F1,
+            curb: 0x7FB3D8,
+            buildings: [0x85C1E9, 0xAED6F1, 0x5DADE2, 0x7FB3D8, 0x95C8E0, 0xB8D8F0]
+        }
+    ];
+    
+    function switchTheme(themeIndex) {
+        if (themeIndex === state.theme || themeIndex < 0 || themeIndex > 3) return;
+        state.theme = themeIndex;
+        
+        const theme = THEME_COLORS[themeIndex];
+        scene.background.setHex(theme.bg);
+        scene.fog.color.setHex(theme.fog);
+        scene.fog.near = themeIndex >= 2 ? 40 : 60;
+        scene.fog.far = themeIndex >= 2 ? 90 : 120;
+        
+        // Update existing track segments
+        for (const seg of state.trackSegments) {
+            seg.children.forEach(function(child) {
+                if (!child.isMesh || !child.material || !child.material.color) return;
+                // Ground
+                if (child.geometry.type === 'BoxGeometry' && child.geometry.parameters.height === 0.2) {
+                    child.material.color.setHex(theme.ground);
+                }
+                // Lane markings
+                if (child.geometry.parameters.height === 0.01) {
+                    child.material.color.setHex(theme.laneMark);
+                }
+                // Curbs
+                if (child.geometry.parameters.height === 0.3) {
+                    child.material.color.setHex(theme.curb);
+                }
+            });
+        }
+        
+        // Update existing buildings
+        for (const b of state.buildings) {
+            if (b.isMesh && b.material && b.material.color) {
+                const hex = b.material.color.getHex();
+                // Only change if it looks like a default building color
+                const palette = THEME_COLORS[themeIndex].buildings;
+                const idx = Math.abs(hashCode(b.id.toString())) % palette.length;
+                b.material.color.setHex(palette[idx]);
+            }
+        }
+        
+        // Update obstacles (train colors)
+        for (const obs of state.obstacles) {
+            obs.children.forEach(function(child) {
+                if (!child.isMesh || !child.material || !child.material.color) return;
+                const hex = child.material.color.getHex();
+                // Only color train body meshes
+                if (hex === 0xE53935 || hex === 0x1E88E5 || hex === 0x43A047 || hex === 0xFB8C00 || hex === 0x8E24AA) {
+                    const trainColors = themeIndex === 0 ? [0xE53935, 0x1E88E5, 0x43A047, 0xFB8C00, 0x8E24AA] :
+                        themeIndex === 1 ? [0x6A1B9A, 0x2E7D32, 0x1565C0, 0xE65100, 0x4E342E] :
+                        themeIndex === 2 ? [0xD84315, 0xFF8F00, 0xC62828, 0xEF6C00, 0xBF360C] :
+                        [0x00ACC1, 0x00838F, 0x0277BD, 0x00695C, 0x4DD0E1];
+                    child.material.color.setHex(trainColors[Math.floor(Math.random() * trainColors.length)]);
+                }
+            });
+        }
+    }
+    
+    function hashCode(s) {
+        let hash = 0;
+        for (let i = 0; i < s.length; i++) {
+            const chr = s.charCodeAt(i);
+            hash = ((hash << 5) - hash) + chr;
+            hash |= 0;
+        }
+        return hash;
+    }
+    
+    // Check for theme change based on score
+    function checkThemeChange() {
+        const score = Math.floor(state.score);
+        let newTheme = 0;
+        if (score >= 3000) newTheme = 3;
+        else if (score >= 1500) newTheme = 2;
+        else if (score >= 500) newTheme = 1;
+        if (newTheme !== state.theme) {
+            switchTheme(newTheme);
+        }
+    }
+
+    // ========== SHOP SYSTEM ==========
+    
+    let shopOverlay = null;
+    
+    function loadShopData() {
+        try {
+            const saved = localStorage.getItem('subwayShop');
+            if (saved) {
+                const data = JSON.parse(saved);
+                state.credits = data.credits || 0;
+                state.equippedAbility = data.equippedAbility || 0;
+                state.canDoubleJump = data.doubleJump || false;
+                state.canJetpack = data.jetpack || false;
+                state.canRoofWalk = data.roofWalk || false;
+            }
+        } catch(e) {}
+    }
+    
+    function saveShopData() {
+        try {
+            const data = {
+                credits: state.credits,
+                equippedAbility: state.equippedAbility,
+                doubleJump: state.canDoubleJump,
+                jetpack: state.canJetpack,
+                roofWalk: state.canRoofWalk
+            };
+            localStorage.setItem('subwayShop', JSON.stringify(data));
+        } catch(e) {}
+    }
+    
+    function showShop() {
+        if (!shopOverlay) {
+            shopOverlay = document.createElement('div');
+            shopOverlay.id = 'shop-overlay';
+            shopOverlay.className = 'overlay';
+        }
+        
+        const owned = [false, state.canDoubleJump, state.canJetpack, state.canRoofWalk];
+        const prices = [0, 10000, 50000, 100000];
+        const names = ['None', 'Double Jump', 'Jetpack', 'Roof Walk'];
+        const descs = ['No ability equipped', 'Double jump in mid-air', 'Fly for 30s every 15s cooldown', 'Walk on top of obstacles'];
+        
+        let html = '<div class="menu-content" style="max-height:85vh;overflow-y:auto;">';
+        html += '<h1 class="menu-title" style="font-size:28px;margin-bottom:5px;">SHOP</h1>';
+        html += '<div style="color:#FFD700;font-size:20px;margin-bottom:15px;">💰 ' + state.credits + ' credits</div>';
+        
+        for (let i = 0; i < 4; i++) {
+            const isEquipped = state.equippedAbility === i;
+            const isOwned = i === 0 || owned[i];
+            const btnClass = isEquipped ? 'diff-btn active' : 'diff-btn';
+            const btnDisabled = !isOwned && state.credits < prices[i] ? 'disabled' : '';
+            html += '<div style="margin:8px 0;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">';
+            html += '<div style="font-size:16px;font-weight:bold;color:white;">' + names[i] + '</div>';
+            html += '<div style="font-size:12px;color:#aaa;margin:3px 0;">' + descs[i] + '</div>';
+            if (i === 0) {
+                if (state.equippedAbility === 0) {
+                    html += '<button class="' + btnClass + '" disabled style="opacity:0.6;">EQUIPPED</button>';
+                } else {
+                    html += '<button class="diff-btn" onclick="__neoEquip(0)">EQUIP NONE</button>';
+                }
+            } else if (isOwned) {
+                if (isEquipped) {
+                    html += '<button class="diff-btn active" disabled style="opacity:0.6;">EQUIPPED</button>';
+                } else {
+                    html += '<button class="diff-btn" onclick="__neoEquip(' + i + ')">EQUIP</button>';
+                }
+            } else {
+                if (state.credits >= prices[i]) {
+                    html += '<button class="diff-btn" onclick="__neoBuy(' + i + ')">BUY ' + prices[i] + 'cr</button>';
+                } else {
+                    html += '<button class="' + btnClass + '" disabled style="opacity:0.4;">' + prices[i] + 'cr</button>';
+                }
+            }
+            html += '</div>';
+        }
+        
+        html += '<div class="menu-btn" onclick="__neoCloseShop()">CLOSE</div>';
+        html += '</div>';
+        
+        shopOverlay.innerHTML = html;
+        document.body.appendChild(shopOverlay);
+        shopOverlay.style.display = 'flex';
+        
+        // Wire up global click handlers
+        window.__neoEquip = function(idx) {
+            state.equippedAbility = idx;
+            state.canDoubleJump = (idx === 1);
+            state.canJetpack = (idx === 2);
+            state.canRoofWalk = (idx === 3);
+            saveShopData();
+            showShop(); // refresh
+        };
+        window.__neoBuy = function(idx) {
+            const prices = [0, 10000, 50000, 100000];
+            if (state.credits >= prices[idx]) {
+                state.credits -= prices[idx];
+                if (idx === 1) state.canDoubleJump = true;
+                else if (idx === 2) state.canJetpack = true;
+                else if (idx === 3) state.canRoofWalk = true;
+                state.equippedAbility = idx;
+                saveShopData();
+                showShop(); // refresh
+            }
+        };
+        window.__neoCloseShop = function() {
+            shopOverlay.style.display = 'none';
+            updateMenuCredits();
+        };
+    }
+    
+    function updateMenuCredits() {
+        const el = document.getElementById('menu-credits');
+        if (el) el.textContent = '💰 TOTAL: ' + state.credits;
+    }
+
     // ========== INIT ==========
     function init() {
         initScene();
+        loadShopData();
         setupUI();
         createPlayer();
         spawnInitialTrack();
@@ -2762,6 +3142,9 @@
         // Show score
         if (scoreEl) scoreEl.textContent = '0';
         if (coinsEl) coinsEl.textContent = '0';
+
+        // Update menu credits
+        updateMenuCredits();
 
         // Show menu initially
         menuOverlay.style.display = 'flex';
