@@ -372,6 +372,30 @@ canvas {
 #dev-console input::placeholder { color: rgba(0,255,0,0.3); }
 
 
+/* ===== MUTE BUTTON ===== */
+#mute-btn {
+    position: absolute;
+    top: 15px;
+    right: 105px;
+    width: 36px;
+    height: 36px;
+    color: rgba(255,255,255,0.7);
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 15;
+    pointer-events: auto;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.3);
+    border-radius: 6px;
+    text-align: center;
+    line-height: 36px;
+    transition: background 0.2s;
+}
+#mute-btn:hover { background: rgba(0,0,0,0.6); }
+#mute-btn:active { background: rgba(0,50,100,0.5); }
+
 /* ===== CONSOLE BUTTON ===== */
 #con-btn {
     position: absolute;

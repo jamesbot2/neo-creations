@@ -66,7 +66,9 @@
         firstPerson: false,
         difficulty: 2,
         homelander: false,
-        laserTimer: 0
+        laserTimer: 0,
+        muted: false,
+        lastPlayedCoin: 0
     };
 
     // ========== THREE.JS SETUP ==========
@@ -232,9 +234,10 @@
     }
 
     // ========== OBSTACLES ==========
-    function createTrain(lane, zPos) {
+    function createTrain(lane, zPos, isMoving) {
         const group = new THREE.Group();
         const laneX = LANE_POSITIONS[lane];
+        const moving = (isMoving !== false) && Math.random() < 0.12;
         const colors = [0xE53935, 0x1E88E5, 0x43A047, 0xFB8C00, 0x8E24AA];
         const mainColor = colors[Math.floor(Math.random() * colors.length)];
 
@@ -319,6 +322,23 @@
         group.userData.height = 1.8;
         group.userData.depth = 5.5;
         group.userData.hasRamp = hasRamp;
+        group.userData.moving = moving;
+        if (moving) {
+            group.userData.moveDir = 1;
+            group.userData.movePhase = Math.random() * Math.PI * 2;
+            group.userData.baseX = laneX;
+            // Yellow warning markers for moving trains
+            group.userData.warningLights = [];
+            const warnMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+            for (let side = -1; side <= 1; side += 2) {
+                for (let end = -1; end <= 1; end += 2) {
+                    const flash = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 0.05), warnMat);
+                    flash.position.set(side * 1.25, 0.9, end * 2.9);
+                    group.add(flash);
+                    group.userData.warningLights.push(flash);
+                }
+            }
+        }
         return group;
     }
 
@@ -359,6 +379,86 @@
 
         group.position.set(laneX, 0, zPos);
         group.userData = { type: 'barrier', lane: lane, width: 1.6, height: 0.6, depth: 1.0 };
+        return group;
+    }
+
+    function createFullLaneBarrier(zPos) {
+        const group = new THREE.Group();
+        
+        // Full lane barrier - blocks ALL lanes, must jump over
+        const beamMat = new THREE.MeshLambertMaterial({ color: 0xFF4444 });
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(GROUND_WIDTH + 1.5, 0.5, 1.2), beamMat);
+        beam.position.set(0, 0.25, 0);
+        group.add(beam);
+        
+        // Warning stripe
+        const stripe = new THREE.Mesh(
+            new THREE.BoxGeometry(GROUND_WIDTH + 1.0, 0.05, 0.05),
+            new THREE.MeshBasicMaterial({ color: 0xFFFFFF })
+        );
+        stripe.position.set(0, 0.5, 0.6);
+        group.add(stripe);
+        const stripe2 = stripe.clone();
+        stripe2.position.z = -0.6;
+        group.add(stripe2);
+        
+        // Side posts
+        const postMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+        for (let side = -1; side <= 1; side += 2) {
+            const post = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 0.15), postMat);
+            post.position.set(side * (GROUND_WIDTH / 2 + 0.8), 0.35, 0);
+            group.add(post);
+            // Top light
+            const light = new THREE.Mesh(
+                new THREE.SphereGeometry(0.08, 4, 4),
+                new THREE.MeshBasicMaterial({ color: 0xFF0000 })
+            );
+            light.position.set(side * (GROUND_WIDTH / 2 + 0.8), 0.75, 0);
+            group.add(light);
+        }
+        
+        group.position.set(0, 0, zPos);
+        group.userData = { type: 'full_barrier', width: GROUND_WIDTH + 1.5, height: 0.5, depth: 1.2 };
+        return group;
+    }
+    
+    function createLowFlyingObstacle(lane, zPos) {
+        const group = new THREE.Group();
+        const laneX = LANE_POSITIONS[lane];
+        
+        // A hovering drone - low flying hazard that you must roll under or jump over
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(1.0, 0.2, 0.8),
+            new THREE.MeshLambertMaterial({ color: 0x444444 })
+        );
+        body.position.set(0, 0.9, 0);
+        group.add(body);
+        
+        // Rotor arms
+        const armMat = new THREE.MeshLambertMaterial({ color: 0x666666 });
+        for (let i = -1; i <= 1; i += 2) {
+            for (let j = -1; j <= 1; j += 2) {
+                const arm = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.04, 0.04), armMat);
+                arm.position.set(i * 0.3, 1.0, j * 0.3);
+                group.add(arm);
+                // Rotor disc
+                const rotor = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.15, 0.15, 0.02, 6),
+                    new THREE.MeshBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.6 })
+                );
+                rotor.position.set(i * 0.3, 1.05, j * 0.3);
+                group.add(rotor);
+            }
+        }
+        
+        // Red blinking light
+        const blinkMat = new THREE.MeshBasicMaterial({ color: 0xFF0000 });
+        const blink = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), blinkMat);
+        blink.position.set(0, 1.0, 0.4);
+        group.add(blink);
+        
+        group.position.set(laneX, 0, zPos);
+        group.userData = { type: 'low_flying', lane: lane, width: 1.0, height: 0.8, depth: 0.8, yOffset: 0.8 };
         return group;
     }
 
@@ -525,6 +625,7 @@
     let audioCtx = null;
 
     function initAudio() {
+        if (state.muted) return;
         try {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         } catch(e) {
@@ -533,7 +634,7 @@
     }
 
     function playCoinSound() {
-        if (!audioCtx) return;
+        if (state.muted || !audioCtx) return;
         try {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
@@ -549,7 +650,7 @@
     }
 
     function playCrashSound() {
-        if (!audioCtx) return;
+        if (state.muted || !audioCtx) return;
         try {
             const bufferSize = audioCtx.sampleRate * 0.4;
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
@@ -574,7 +675,7 @@
     }
 
     function playJumpSound() {
-        if (!audioCtx) return;
+        if (state.muted || !audioCtx) return;
         try {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
@@ -591,7 +692,7 @@
     }
 
     function playRollSound() {
-        if (!audioCtx) return;
+        if (state.muted || !audioCtx) return;
         try {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
@@ -690,8 +791,10 @@
                         if (hasRollNearby) type = 0.8;
                     }
                     let obs;
-                    if (type < 0.4) obs = createTrain(lane, z);
-                    else if (type < 0.55) obs = createBarrier(lane, z);
+                    if (type < 0.30) obs = createTrain(lane, z, false);
+                    else if (type < 0.50) obs = createBarrier(lane, z);
+                    else if (type < 0.55) obs = createFullLaneBarrier(z);
+                    else if (type < 0.75) obs = createLowFlyingObstacle(lane, z);
                     else obs = createRollUnderTrain(lane, z);
                     scene.add(obs);
                     state.obstacles.push(obs);
@@ -766,8 +869,10 @@
                 }
 
                 let obs;
-                if (type < 0.4) obs = createTrain(lane, z);
-                else if (type < 0.55) obs = createBarrier(lane, z);
+                if (type < 0.30) obs = createTrain(lane, z, true);
+                else if (type < 0.50) obs = createBarrier(lane, z);
+                else if (type < 0.55) obs = createFullLaneBarrier(z);
+                else if (type < 0.75) obs = createLowFlyingObstacle(lane, z);
                 else obs = createRollUnderTrain(lane, z);
                 scene.add(obs);
                 state.obstacles.push(obs);
@@ -1106,8 +1211,8 @@
             btn.addEventListener('mousedown', start);
             btn.addEventListener('mouseup', end);
         }
-        bindMobileBtn('m-left', moveLeft);
-        bindMobileBtn('m-right', moveRight);
+        bindMobileBtn('m-left', moveLeft, 'ArrowLeft');
+        bindMobileBtn('m-right', moveRight, 'ArrowRight');
         bindMobileBtn('m-jump', jump, 'w');
         bindMobileBtn('m-roll', roll, 's');
     }
@@ -1263,6 +1368,10 @@
     }
 
     function moveLeft() {
+        if (state.homelander && homelanderGroup) {
+            homelanderGroup.position.x -= 0.35;
+            return;
+        }
         if (state.currentLane > 0) {
             state.startLaneX = player.position.x;
             state.currentLane--;
@@ -1272,6 +1381,10 @@
     }
 
     function moveRight() {
+        if (state.homelander && homelanderGroup) {
+            homelanderGroup.position.x += 0.35;
+            return;
+        }
         if (state.currentLane < LANE_COUNT - 1) {
             state.startLaneX = player.position.x;
             state.currentLane++;
@@ -1324,13 +1437,16 @@
             // Train: height=1.8, visual body center at y=0.9
             // Barrier: height=0.6, visual body center at y=0.3
             // Roll-under: height=0.5 (gap), top bar at y=1.4
+            // Full-barrier: height=0.5, center at y=0.25
+            // Low-flying: height=0.8, center at y=0.9 (hovering drone)
             let obsY, obsH;
             if (od.type === 'roll_under') {
-                // Top bar is at y=1.4, height 0.5, so center at y=1.65
                 obsY = 1.65;
                 obsH = 0.5;
+            } else if (od.type === 'low_flying') {
+                obsY = 1.0;
+                obsH = 0.8;
             } else {
-                // Use the position from the group + reported height
                 obsY = obs.position.y + (od.height || 0.6) / 2;
                 obsH = od.height || 0.6;
             }
@@ -1347,6 +1463,26 @@
             // Roll under: player rolling can pass under
             if (od.type === 'roll_under' && state.isRolling) {
                 continue;
+            }
+            
+            // Low flying: can roll under OR jump over
+            if (od.type === 'low_flying') {
+                if (state.isRolling) {
+                    continue; // roll under
+                }
+                if (state.isJumping && player.position.y > 0.8) {
+                    continue; // jump over
+                }
+            }
+            
+            // Full lane barrier: must jump (not roll, it's on the ground)
+            if (od.type === 'full_barrier') {
+                if (state.isJumping && player.position.y > 0.8) {
+                    continue; // jumped over
+                }
+                if (state.isRolling) {
+                    return true; // rolling hits it
+                }
             }
             
             // Ramp train: board from the BACK of the train (ramp is behind)
@@ -1390,6 +1526,8 @@
         pauseBtnEl.style.display = 'block';
         const cb = document.getElementById('con-btn');
         if (cb) cb.style.display = 'block';
+        const mb = document.getElementById('mute-btn');
+        if (mb) mb.style.display = 'block';
         if (!audioCtx) initAudio();
         clock.getDelta();
         const f = document.getElementById('fpv-btn');
@@ -1426,6 +1564,19 @@
             pauseOverlay.style.display = 'none';
             pauseBtnEl.textContent = '\u23F8';
             clock.getDelta();
+        }
+    }
+    
+    function toggleMute() {
+        state.muted = !state.muted;
+        const muteBtn = document.getElementById('mute-btn');
+        if (muteBtn) {
+            muteBtn.textContent = state.muted ? '\uD83D\uDD07' : '\uD83D\uDD0A';
+        }
+        if (state.muted && audioCtx) {
+            try { audioCtx.suspend(); } catch(e) {}
+        } else if (!state.muted && audioCtx && audioCtx.state === 'suspended') {
+            try { audioCtx.resume(); } catch(e) {}
         }
     }
 
@@ -1484,6 +1635,8 @@
         pauseOverlay.style.display = 'none';
         pauseBtnEl.style.display = 'none';
         menuOverlay.style.display = 'flex';
+        const muteInMenu = document.getElementById('mute-btn');
+        if (muteInMenu) muteInMenu.style.display = 'none';
 
         spawnInitialTrack();
         spawnBuildings();
@@ -1554,6 +1707,8 @@
         const bestEl = document.getElementById('best-score');
         if (bestEl) bestEl.textContent = 'BEST: ' + state.bestScore + 'm';
         pauseBtnEl.style.display = 'none';
+        const muteGameOver = document.getElementById('mute-btn');
+        if (muteGameOver) muteGameOver.style.display = 'none';
     }
 
     // ========== UPDATE LOOP ==========
@@ -1627,6 +1782,25 @@
         // Move obstacles
         for (const obs of state.obstacles) {
             obs.position.z += state.speed * delta * 60;
+        }
+        
+        // Moving obstacles: oscillate left-right between lanes
+        for (const obs of state.obstacles) {
+            if (obs.userData.moving) {
+                const ud = obs.userData;
+                ud.movePhase += delta * 2.0;
+                const offset = Math.sin(ud.movePhase) * LANE_WIDTH * 1.0;
+                obs.position.x = ud.baseX + offset;
+                // Flash warning lights
+                if (ud.warningLights) {
+                    const flashOn = Math.sin(state.gameTime * 12) > 0;
+                    for (const light of ud.warningLights) {
+                        if (light && light.material) {
+                            light.material.color.setHex(flashOn ? 0xFFFF00 : 0x886600);
+                        }
+                    }
+                }
+            }
         }
 
         // Move coins
