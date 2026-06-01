@@ -1968,6 +1968,8 @@
         homelanderGroup.add(belt);
         
         scene.add(homelanderGroup);
+        // Update exposed reference for debugging
+        if (window.__neoGame) window.__neoGame.homelanderGroup = homelanderGroup;
         
         // Disable normal physics, fly up
         state.isJumping = false;
