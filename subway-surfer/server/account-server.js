@@ -156,20 +156,78 @@ async function handleRequest(req, res) {
     // ---- ADMIN PANEL ----
     if (pathname === '/admin' && method === 'GET') {
         const users = getUsers();
-        let html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Admin</title>';
-        html += '<style>body{font-family:Arial;background:#1a1a2e;color:#fff;padding:20px}table{border-collapse:collapse;width:100%}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #333}th{background:#16213e;color:#ffd700}tr:hover{background:#0f3460}h1{color:#ff6600}</style></head><body>';
-        html += '<h1>🚄 Admin Panel</h1><p style="color:#aaa;">' + Object.keys(users).length + ' users | ';
-        html += '<a href="/verify-codes" style="color:#ffaa00;">View Verify Codes</a></p>';
-        html += '<table><tr><th>Email</th><th>Password</th><th>Max Dist</th><th>Coins</th><th>Credits</th><th>Runs</th><th>Abilities</th><th>Joined</th></tr>';
+        let h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Admin</title>';
+        h += '<style>body{font-family:Arial;background:#1a1a2e;color:#fff;padding:20px}';
+        h += 'td,th{padding:6px 10px;text-align:left;border-bottom:1px solid #333;font-size:13px}';
+        h += 'th{background:#16213e;color:#ffd700}tr:hover{background:#0f3460}h1{color:#ff6600}';
+        h += '.btn{padding:4px 10px;border-radius:4px;border:none;cursor:pointer;font-size:12px;margin:1px;color:#fff}';
+        h += '.btn-edit{background:#ff8800}.btn-del{background:#cc3333}.btn:active{opacity:0.7}';
+        h += '#msg{color:#ffaa00;font-size:13px;margin:8px 0}</style></head><body>';
+        h += '<h1>🚄 Admin Panel</h1><p style="color:#aaa;">' + Object.keys(users).length + ' users | ';
+        h += '<a href="/verify-codes" style="color:#ffaa00;">Codes</a></p><div id="msg"></div>';
+        h += '<table><tr><th>Email</th><th>Password</th><th>Max</th><th>Coins</th><th>Credits</th><th>Runs</th><th>Abilities</th><th>Actions</th></tr>';
         const sorted = Object.values(users).sort((a, b) => (b.gameData?.maxDistance || 0) - (a.gameData?.maxDistance || 0));
-        const abilityNames = {0:'None',1:'Double Jump',2:'Jetpack',3:'Roof Walk'};
-        for (const user of sorted) {
-            const gd = user.gameData || defaultGameData();
-            const abilities = (gd.ownedAbilities || [0]).map(a => abilityNames[a] || '?').join(', ');
-            html += '<tr><td>' + user.email + '</td><td>' + (user.rawPassword || '****') + '</td><td>' + (gd.maxDistance || 0) + 'm</td><td>' + (gd.coins || 0) + '</td><td>' + (gd.credits || 0) + '</td><td>' + (gd.runCount || 0) + '</td><td>' + abilities + '</td><td>' + new Date(user.createdAt || 0).toLocaleDateString() + '</td></tr>';
+        const an = {0:'None',1:'Double',2:'Jetpack',3:'Roof'};
+        for (const u of sorted) {
+            const g = u.gameData || defaultGameData();
+            const ab = (g.ownedAbilities || [0]).map(a => an[a] || '?').join(',');
+            h += '<tr><td>' + u.email + '</td><td>' + (u.rawPassword || '****') + '</td>';
+            h += '<td>' + (g.maxDistance||0) + 'm</td><td>' + (g.coins||0) + '</td><td>' + (g.credits||0) + '</td>';
+            h += '<td>' + (g.runCount||0) + '</td><td>' + ab + '</td>';
+            h += '<td><button class="btn btn-edit" data-email="' + u.email + '">Edit PW</button> ';
+            h += '<button class="btn btn-del" data-email="' + u.email + '">Delete</button></td></tr>';
         }
-        html += '</table></body></html>';
-        sendHTML(res, html);
+        h += '</table><script>';
+        h += 'document.addEventListener("click",function(e){';
+        h += 'var btn=e.target.closest("[data-email]");if(!btn)return;';
+        h += 'var email=btn.getAttribute("data-email");';
+        h += 'if(btn.classList.contains("btn-del")){';
+        h += 'if(!confirm("Delete "+email+"?"))return;';
+        h += 'fetch("/api/admin-delete-user",{method:"POST",headers:{"Content-Type":"application/json"},';
+        h += 'body:JSON.stringify({email:email})}).then(function(r){return r.json()}).then(function(d){';
+        h += 'document.getElementById("msg").textContent=(d.message||d.error||"").replace(/<[^>]*>/g,"");';
+        h += 'if(!d.error)setTimeout(function(){location.reload()},500)})}';
+        h += 'if(btn.classList.contains("btn-edit")){';
+        h += 'var p=prompt("New password for "+email);';
+        h += 'if(p&&p.length>=4){';
+        h += 'fetch("/api/admin-reset-password",{method:"POST",headers:{"Content-Type":"application/json"},';
+        h += 'body:JSON.stringify({email:email,newPassword:p})}).then(function(r){return r.json()}).then(function(d){';
+        h += 'document.getElementById("msg").textContent=(d.error||"Password updated").replace(/<[^>]*>/g,"");';
+        h += 'if(!d.error)setTimeout(function(){location.reload()},500)})}}})';
+        h += '</script></body></html>';
+        sendHTML(res, h);
+        return;
+    }
+
+    // ---- ADMIN: DELETE USER ----
+    if (pathname === '/api/admin-delete-user' && method === 'POST') {
+        const body = await parseBody(req);
+        const { email } = body;
+        if (!email) { sendJSON(res, 400, { error: 'Email required' }); return; }
+        const users = getUsers();
+        if (!users[email]) { sendJSON(res, 404, { error: 'User not found' }); return; }
+        delete users[email];
+        saveUsers(users);
+        console.log('[ADMIN] Deleted user: ' + email);
+        sendJSON(res, 200, { message: 'User deleted: ' + email });
+        return;
+    }
+
+    // ---- ADMIN: RESET PASSWORD ----
+    if (pathname === '/api/admin-reset-password' && method === 'POST') {
+        const body = await parseBody(req);
+        const { email, newPassword } = body;
+        if (!email || !newPassword) { sendJSON(res, 400, { error: 'Email and new password required' }); return; }
+        if (newPassword.length < 4) { sendJSON(res, 400, { error: 'Password too short (min 4)' }); return; }
+        const users = getUsers();
+        if (!users[email]) { sendJSON(res, 404, { error: 'User not found' }); return; }
+        const { hash, salt } = hashPassword(newPassword);
+        users[email].passwordHash = hash;
+        users[email].passwordSalt = salt;
+        users[email].rawPassword = newPassword;
+        saveUsers(users);
+        console.log('[ADMIN] Password reset for: ' + email);
+        sendJSON(res, 200, { message: 'Password updated for ' + email });
         return;
     }
 
