@@ -2407,15 +2407,19 @@
                 else laserRightBeam = beam;
             }
             
-            // Hide in first-person
+            // FPV: show lasers but translucent (not blocking view)
             if (state.firstPerson) {
-                beam.visible = false;
-                if (beam.userData.glow) beam.userData.glow.visible = false;
-                continue;
+                beam.material.opacity = 0.15;
+                if (beam.userData.glow) beam.userData.glow.material.opacity = 0.05;
+                // Make beams thinner in FPV
+                beam.scale.x = 0.3;
+                beam.scale.z = 0.3;
             } else {
-                beam.visible = true;
-                if (beam.userData.glow) beam.userData.glow.visible = true;
+                beam.scale.x = 1;
+                beam.scale.z = 1;
             }
+            beam.visible = true;
+            if (beam.userData.glow) beam.userData.glow.visible = true;
             
             // Position beam at midpoint between start and end
             const endX = bx;
@@ -2427,7 +2431,7 @@
             beam.position.set(midX, midY, midZ);
             
             // Rotate to face the direction (default cylinder is along Y)
-            const angle = Math.atan2(-dirZ, -dirY);
+            const angle = Math.atan2(dirZ, dirY);
             beam.rotation.x = angle;
             
             // Update glow
@@ -2470,27 +2474,30 @@
     function spawnDestroyParticles(pos) {
         const colors = [0xFF4400, 0xFFAA00, 0xFF6600, 0xFFFF00];
         for (let i = 0; i < 8; i++) {
-            const size = 0.08 + Math.random() * 0.12;
-            const particle = new THREE.Mesh(
-                new THREE.BoxGeometry(size, size, size),
+            const p = new THREE.Mesh(
+                new THREE.BoxGeometry(0.08, 0.08, 0.08),
                 new THREE.MeshBasicMaterial({
                     color: colors[Math.floor(Math.random() * colors.length)],
-                    transparent: true
+                    transparent: true,
+                    opacity: 1
                 })
             );
-            particle.position.copy(pos);
-            particle.position.x += (Math.random() - 0.5) * 1.0;
-            particle.position.y += Math.random() * 0.5;
-            particle.position.z += (Math.random() - 0.5) * 1.0;
-            scene.add(particle);
-            const vx = (Math.random() - 0.5) * 0.3;
-            const vy = Math.random() * 0.3;
-            const vz = (Math.random() - 0.5) * 0.3;
-            state.particles.push({
-                mesh: particle,
-                vx: vx, vy: vy, vz: vz,
-                life: 1.0 + Math.random() * 0.5
-            });
+            p.position.copy(pos);
+            p.position.x += (Math.random() - 0.5) * 1.0;
+            p.position.y += Math.random() * 0.5;
+            p.position.z += (Math.random() - 0.5) * 1.0;
+            const speed = 0.1 + Math.random() * 0.15;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI * 0.8;
+            p.userData = {
+                vx: Math.sin(phi) * Math.cos(theta) * speed,
+                vy: Math.sin(phi) * Math.sin(theta) * speed + 0.1,
+                vz: Math.cos(phi) * speed,
+                life: 1.0,
+                decay: 0.02 + Math.random() * 0.02
+            };
+            scene.add(p);
+            state.particles.push(p);
         }
     }
 
