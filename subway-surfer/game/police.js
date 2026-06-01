@@ -113,16 +113,17 @@
 
         var playerPos = SG.player ? SG.player.position : { x: 0, z: 0 };
 
-        // Police car speed is slightly faster than player
-        var policeSpeed = SG.state.speed * 1.05;
-
-        // Move police car toward player (decreasing policeDistance)
-        var speedDiff = policeSpeed - SG.state.speed;
-        SG.state.policeDistance -= speedDiff * delta * 60;
+        // Police catches up at a SLOW constant rate (not speed-proportional)
+        // 0.0015 per frame ~= 0.09 units/sec at 60fps = ~90 seconds to close 8m gap
+        var catchRate = 0.0015;
+        // Speed up slightly at higher player speeds for challenge
+        catchRate += Math.max(0, (SG.state.speed - 0.5)) * 0.0005;
+        
+        SG.state.policeDistance -= catchRate * delta * 60;
 
         // Clamp police distance
         if (SG.state.policeDistance < 0) SG.state.policeDistance = 0;
-        if (SG.state.policeDistance > 8) SG.state.policeDistance = 8;
+        if (SG.state.policeDistance > 12) SG.state.policeDistance = 12;
 
         // Position police car behind the player
         policeGroup.position.x += (playerPos.x - policeGroup.position.x) * 0.05;
@@ -137,16 +138,15 @@
         if (lightLeft && lightRight) {
             lightLeft.material.color.setHex(flashOn ? 0xFF0000 : 0x880000);
             lightRight.material.color.setHex(flashOn ? 0x0000FF : 0x000088);
-            // Scale flash for visual effect
             var flashScale = flashOn ? 1.3 : 0.7;
             lightLeft.scale.setScalar(flashScale);
             lightRight.scale.setScalar(flashScale);
         }
 
-        // Start siren if close enough
-        if (SG.state.policeDistance < 5 && !SG.state.policeSiren) {
+        // Siren starts when police gets closer
+        if (SG.state.policeDistance < 6 && !SG.state.policeSiren) {
             SG.startSiren();
-        } else if (SG.state.policeDistance >= 5 && SG.state.policeSiren) {
+        } else if (SG.state.policeDistance >= 8 && SG.state.policeSiren) {
             SG.stopSiren();
         }
 
@@ -156,7 +156,6 @@
             policeEl.style.display = 'block';
             var dist = Math.round(SG.state.policeDistance * 10) / 10;
             policeEl.textContent = '\uD83D\uDE94 DISTANCE: ' + dist + 'm';
-            // Color changes based on distance
             if (dist < 2) {
                 policeEl.style.color = '#ff0000';
                 policeEl.style.borderColor = 'rgba(255,0,0,0.6)';
@@ -201,6 +200,6 @@
 
     SG.coinPushBackPolice = function() {
         if (!SG.state.policeChasing) return;
-        SG.state.policeDistance = Math.min(8, SG.state.policeDistance + 0.5);
+        SG.state.policeDistance = Math.min(12, SG.state.policeDistance + 1.0);
     };
 })();

@@ -92,7 +92,7 @@
         SG.state.jetpackFuel = 0;
         SG.state.jetpackCooldown = 0;
         SG.state.policeChasing = false;
-        SG.state.policeDistance = 8.0;
+        SG.state.policeDistance = 12.0;
         SG.state.policeCaught = false;
 
         if (SG.player) {
@@ -155,7 +155,7 @@
         SG.state.jetpackFuel = 0;
         SG.state.jetpackCooldown = 0;
         SG.state.policeChasing = false;
-        SG.state.policeDistance = 8.0;
+        SG.state.policeDistance = 12.0;
         SG.state.policeCaught = false;
 
         if (SG.player) {
@@ -528,7 +528,7 @@
         SG.checkThemeChange();
 
         // Police chase: start after 100m
-        if (!SG.state.policeChasing && SG.state.policeTotalDistance > 100 && !SG.state.gameOver && !SG.state.homelander) {
+        if (!SG.state.policeChasing && SG.state.policeTotalDistance > 200 && !SG.state.gameOver && !SG.state.homelander) {
             SG.startPoliceChase();
         }
 
