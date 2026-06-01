@@ -848,25 +848,7 @@
         consoleEl.innerHTML = '<input type="text" id="console-input" placeholder="enter command..." autofocus/>';
         uiOverlay.appendChild(consoleEl);
 
-        // Console input event
-        const conInput = document.getElementById('console-input');
-        conInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const val = conInput.value.trim().toLowerCase();
-                conInput.value = '';
-                consoleEl.style.display = 'none';
-                state.paused = false;
-                if (val === 'homelander') {
-                    state.homelander = true;
-                    activateHomelander();
-                }
-            }
-            if (e.key === 'Escape') {
-                consoleEl.style.display = 'none';
-                state.paused = false;
-            }
-            e.stopPropagation();
-        });
+
 
         // ===== PAUSE BUTTON =====
         pauseBtnEl = document.createElement('div');
