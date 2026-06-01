@@ -390,11 +390,6 @@
             signoutBtn.addEventListener('touchend', function(e) { e.stopPropagation(); e.preventDefault(); SG.accountLogout(); });
         }
 
-        if (accBtnMenu) {
-            accBtnMenu.addEventListener("click", function(e) { e.stopPropagation(); SG.showAccountModal(); });
-            accBtnMenu.addEventListener("touchend", function(e) { e.stopPropagation(); e.preventDefault(); SG.showAccountModal(); });
-        }
-
         var pauseTapBtn = SG.pauseOverlay.querySelector('.tap-to-start');
         if (pauseTapBtn) {
             pauseTapBtn.addEventListener('click', function(e) { e.stopPropagation(); SG.togglePause(); });
