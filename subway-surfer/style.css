@@ -165,12 +165,13 @@ canvas {
 #con-btn:hover { background: rgba(0,0,0,0.6); transform: scale(1.08); }
 #con-btn:active { transform: scale(0.92); background: rgba(0,100,0,0.4); }
 
-#mute-btn, #sfx-btn, #music-btn {
+#mute-btn {
     position: absolute;
-    bottom: 100px;
+    top: 16px;
+    left: 66px;
     width: 40px;
     height: 40px;
-    font-size: 16px;
+    font-size: 18px;
     cursor: pointer;
     z-index: 15;
     pointer-events: auto;
@@ -184,12 +185,11 @@ canvas {
     color: rgba(255,255,255,0.7);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
+    text-align: center;
+    line-height: 40px;
 }
-#mute-btn:hover, #sfx-btn:hover, #music-btn:hover { background: rgba(0,0,0,0.6); transform: scale(1.08); }
-#mute-btn:active, #sfx-btn:active, #music-btn:active { transform: scale(0.92); }
-#mute-btn { left: 16px; }
-#sfx-btn { left: 64px; }
-#music-btn { left: 112px; }
+#mute-btn:hover { background: rgba(0,0,0,0.6); transform: scale(1.08); }
+#mute-btn:active { transform: scale(0.92); }
 
 /* ===== GAME OVER ===== */
 #game-over-screen {
@@ -570,15 +570,14 @@ canvas {
     }
     #fpv-btn { right: 12px; }
     #con-btn { right: 54px; }
-    #mute-btn, #sfx-btn, #music-btn {
-        width: 30px;
-        height: 30px;
-        font-size: 13px;
-        bottom: 80px;
+    #mute-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 15px;
+        top: 12px;
+        left: 54px;
+        line-height: 34px;
     }
-    #mute-btn { left: 10px; }
-    #sfx-btn { left: 48px; }
-    #music-btn { left: 86px; }
     .menu-title { font-size: 38px; }
     .tap-to-start { font-size: 18px; padding: 10px 30px; }
     #game-over-screen h1 { font-size: 36px; }
