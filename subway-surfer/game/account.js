@@ -201,7 +201,12 @@
     // Override init to show login first
     var origInit = SG.init;
     SG.init = function() {
-        if (origInit) origInit(); // Run original init FIRST
+        try {
+            if (origInit) origInit();
+        } catch(e) {
+            document.body.innerHTML += '<div style="position:fixed;top:0;left:0;width:100%;background:#ff0000;color:#fff;padding:20px;z-index:9999;font-size:16px;">ERROR: ' + e.message + '<br>' + e.stack.split('\n').slice(0,3).join('<br>') + '</div>';
+            return;
+        } // Run original init FIRST
 
         // Wrap setupUI to handle login state
         var origSetup = SG.setupUI;
