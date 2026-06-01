@@ -91,6 +91,43 @@ function defaultGameData() {
     return { coins: 0, credits: 0, equippedAbility: 0, ownedAbilities: [0], maxDistance: 0, runCount: 0, highScore: 0, totalCoins: 0 };
 }
 
+function sendEmail(to, subject, body) {
+    return new Promise(function(resolve) {
+        try {
+            const net = require('net');
+            const client = new net.Socket();
+            let response = '';
+            let step = 0;
+            const lines = [
+                'HELO subway.local\r\n',
+                'MAIL FROM:<noreply@subwaysurfer.neo>\r\n',
+                'RCPT TO:<' + to + '>\r\n',
+                'DATA\r\n',
+                'From: "Subway Surfer" <noreply@subwaysurfer.neo>\r\n' +
+                'To: ' + to + '\r\n' +
+                'Subject: ' + subject + '\r\n' +
+                'Content-Type: text/plain; charset=utf-8\r\n' +
+                '\r\n' +
+                body + '\r\n.\r\n',
+                'QUIT\r\n'
+            ];
+            client.connect(25, '127.0.0.1', function() {});
+            client.on('data', function(data) {
+                response += data.toString();
+                if (response.includes('220') || response.includes('250') || response.includes('354') || response.includes('221')) {
+                    if (step < lines.length) {
+                        client.write(lines[step]);
+                        step++;
+                    }
+                }
+            });
+            client.on('end', function() { resolve(true); });
+            client.on('error', function() { resolve(false); });
+            setTimeout(function() { client.destroy(); resolve(false); }, 5000);
+        } catch(e) { resolve(false); }
+    });
+}
+
 async function handleRequest(req, res) {
     const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = parsedUrl.pathname;
@@ -219,6 +256,18 @@ async function handleRequest(req, res) {
         console.log('Email: ' + email);
         console.log('Code:  ' + code);
         console.log('=========================\n');
+
+        // Send verification email
+        try {
+            sendEmail(email, 'Subway Surfer - Verification Code',
+                'Your verification code is: ' + code + '\n\n' +
+                'Enter this code in the app to verify your email.\n\n' +
+                'Code: ' + code + '\n\n' +
+                'This code expires in 10 minutes.');
+            console.log('[EMAIL SENT] to ' + email);
+        } catch(e) {
+            console.log('[EMAIL FAILED] ' + e.message);
+        }
 
         sendJSON(res, 201, { message: 'Verification code: ' + code, email, code: code });
         return;
