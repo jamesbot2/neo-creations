@@ -12,6 +12,7 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 // In-memory verification codes (email -> {code, expires})
 var verifyCodes = {};
+var captchaStore = {};
 
 function readDB(file) {
     try { if (!fs.existsSync(file)) return {}; return JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) { return {}; }
@@ -147,14 +148,56 @@ async function handleRequest(req, res) {
         return;
     }
 
+    // ---- CAPTCHA IMAGE ----
+    if (pathname === '/api/captcha' && method === 'GET') {
+        const captchaId = crypto.randomBytes(8).toString('hex');
+        const code = Math.floor(10000 + Math.random() * 90000).toString();
+        captchaStore[captchaId] = { code, expires: Date.now() + 5 * 60 * 1000 };
+
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60">' +
+          '<rect width="200" height="60" fill="#2a2a4a" rx="8"/>' +
+          code.split('').map(function(ch, i) {
+            var x = 20 + i * 35;
+            var y = 32 + Math.sin(i * 1.3) * 6;
+            var rot = (Math.random() - 0.5) * 25;
+            return '<text x="' + x + '" y="' + y + '" transform="rotate(' + rot + ',' + x + ',' + y + ')" ' +
+              'font-size="28" font-weight="bold" fill="#ff6600" font-family="Arial" ' +
+              'stroke="#ffaa00" stroke-width="1">' + ch + '</text>';
+          }).join('') +
+          Array.from({length: 4}, function() {
+            return '<line x1="' + Math.random()*200 + '" y1="' + Math.random()*60 + '" ' +
+              'x2="' + Math.random()*200 + '" y2="' + Math.random()*60 + '" ' +
+              'stroke="rgba(255,255,255,0.12)" stroke-width="1"/>';
+          }).join('') +
+          '</svg>';
+
+        sendJSON(res, 200, { captchaId: captchaId, svg: svg });
+        return;
+    }
+
     // ---- REGISTER ----
+
     if (pathname === '/api/register' && method === 'POST') {
         const body = await parseBody(req);
-        const { email, password } = body;
+        const { email, password, captchaId, captchaAnswer } = body;
 
         if (!email || !password) { sendJSON(res, 400, { error: 'Email and password required' }); return; }
+        if (!captchaId || !captchaAnswer) { sendJSON(res, 400, { error: 'Captcha required' }); return; }
         if (!validateEmail(email)) { sendJSON(res, 400, { error: 'Invalid email format' }); return; }
         if (password.length < 6) { sendJSON(res, 400, { error: 'Password must be at least 6 characters' }); return; }
+
+        // Verify captcha
+        const captcha = captchaStore[captchaId];
+        if (!captcha || captcha.code !== captchaAnswer) {
+            sendJSON(res, 400, { error: 'Incorrect captcha. Try again.' });
+            return;
+        }
+        if (Date.now() > captcha.expires) {
+            delete captchaStore[captchaId];
+            sendJSON(res, 400, { error: 'Captcha expired. Refresh.' });
+            return;
+        }
+        delete captchaStore[captchaId];
 
         const users = getUsers();
         if (users[email]) { sendJSON(res, 409, { error: 'Email already registered' }); return; }
