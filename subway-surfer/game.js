@@ -2103,6 +2103,8 @@
     // ========== HOMELANDER EASTER EGG ==========
     let homelanderGroup = null;
     let laserBeams = [];
+    let laserLeftBeam = null;
+    let laserRightBeam = null;
     let homelanderCape = null;
 
     function activateHomelander() {
@@ -2170,19 +2172,35 @@
         // Generate US flag texture
         const flagTex = createUSFlagTexture();
         
-        // Main cape - uses curved plane segments for a draped look
-        const capeGeo = new THREE.BoxGeometry(1.1, 0.85, 0.02);
+        // Cape using PlaneGeometry (single face, no side artifacts)
+        // Segmented so we can see the full flag from any angle
+        const capeGeo = new THREE.PlaneGeometry(1.2, 0.92);
         const capeMat = new THREE.MeshLambertMaterial({ 
             map: flagTex,
-            side: THREE.DoubleSide
+            side: THREE.DoubleSide,
+            transparent: false
         });
         homelanderCape = new THREE.Mesh(capeGeo, capeMat);
-        // Position: starts from shoulders (y=0.95), draping down to mid-thigh
+        // Position: draped from shoulders (y=0.95) to mid-thigh
         homelanderCape.position.set(0, 0.62, -0.18);
-        homelanderCape.rotation.x = 0.25;
+        homelanderCape.rotation.x = 0.20;
         homelanderGroup.add(homelanderCape);
         
-        // Cape clasp/knot at the neck (where cape connects to shoulders)
+        // Dark red backing for the cape (to give depth from behind)
+        const backMat = new THREE.MeshLambertMaterial({ 
+            color: 0x550000, 
+            side: THREE.DoubleSide,
+            transparent: false
+        });
+        const backCape = new THREE.Mesh(
+            new THREE.PlaneGeometry(1.22, 0.94),
+            backMat
+        );
+        backCape.position.set(0, 0.62, -0.185);
+        backCape.rotation.x = 0.20;
+        homelanderGroup.add(backCape);
+        
+        // Cape clasp/knot at the neck
         const claspMat = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
         const clasp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.04, 6), claspMat);
         clasp.position.set(0, 0.97, -0.13);
@@ -2198,15 +2216,6 @@
             btn.position.set(side * 0.12, 0.95, -0.14);
             homelanderGroup.add(btn);
         }
-        
-        // Backing cape layer (slightly larger, darker for depth)
-        const backCape = new THREE.Mesh(
-            new THREE.BoxGeometry(1.15, 0.88, 0.01),
-            new THREE.MeshLambertMaterial({ color: 0x550000, side: THREE.DoubleSide })
-        );
-        backCape.position.set(0, 0.62, -0.195);
-        backCape.rotation.x = 0.25;
-        homelanderGroup.add(backCape);
         
         // === EAGLE EMBLEM on chest ===
         const emblemMat = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
@@ -2287,9 +2296,28 @@
             homelanderGroup = null;
         }
         // Clean up lasers
-        for (const b of laserBeams) {
-            scene.remove(b.mesh);
+        if (laserLeftBeam) {
+            if (laserLeftBeam.userData.glow) {
+                scene.remove(laserLeftBeam.userData.glow);
+                laserLeftBeam.userData.glow.geometry.dispose();
+                laserLeftBeam.userData.glow.material.dispose();
+            }
+            scene.remove(laserLeftBeam);
+            laserLeftBeam.geometry.dispose();
+            laserLeftBeam.material.dispose();
         }
+        if (laserRightBeam) {
+            if (laserRightBeam.userData.glow) {
+                scene.remove(laserRightBeam.userData.glow);
+                laserRightBeam.userData.glow.geometry.dispose();
+                laserRightBeam.userData.glow.material.dispose();
+            }
+            scene.remove(laserRightBeam);
+            laserRightBeam.geometry.dispose();
+            laserRightBeam.material.dispose();
+        }
+        laserLeftBeam = null;
+        laserRightBeam = null;
         laserBeams = [];
         homelanderCape = null;
         // Show original player
@@ -2315,31 +2343,123 @@
         if (homelanderGroup.position.y < 1) homelanderGroup.position.y = 1;
         if (homelanderGroup.position.y > 20) homelanderGroup.position.y = 20;
         
-        // Cape flutter animation
+        // Cape flutter animation - both front and back capes move together
         if (homelanderCape) {
-            homelanderCape.rotation.x = 0.25 + Math.sin(state.gameTime * 3) * 0.15;
-            // Subtle side sway
-            homelanderCape.rotation.z = Math.sin(state.gameTime * 2.5) * 0.05;
+            const flutter = Math.sin(state.gameTime * 3);
+            const tilt = 0.20 + flutter * 0.20;
+            homelanderCape.rotation.x = tilt;
+            homelanderCape.rotation.z = Math.sin(state.gameTime * 2.5) * 0.06;
+            // Find the backCape (last child before clasp... use the one at position.z < -0.18)
+            for (let i = homelanderGroup.children.length - 1; i >= 0; i--) {
+                const child = homelanderGroup.children[i];
+                if (child !== homelanderCape && child.position.z < -0.18 && child.geometry && child.geometry.type === 'PlaneGeometry') {
+                    child.rotation.x = tilt;
+                    child.rotation.z = homelanderCape.rotation.z;
+                    break;
+                }
+            }
         }
         
-        // Laser eyes - fire diagonally downward (slower when moving vertically)
-        state.laserTimer -= delta;
-        if (state.laserTimer <= 0) {
-            state.laserTimer = 0.15;
-            fireLaser();
-        }
+        // Continuous laser beams from the eyes - always-on, pointing forward-downward
+        const laserLength = 12;
+        laserBeams.length = 0; // Clear old position cache
         
-        // Remove old lasers
-        for (let i = laserBeams.length - 1; i >= 0; i--) {
-            const beam = laserBeams[i];
-            beam.life -= delta;
-            beam.mesh.position.x += beam.vx * delta * 60;
-            beam.mesh.position.y += beam.vy * delta * 60;
-            beam.mesh.position.z += beam.vz * delta * 60;
-            beam.mesh.scale.setScalar(Math.max(0, beam.life * 2));
-            if (beam.life <= 0) {
-                scene.remove(beam.mesh);
-                laserBeams.splice(i, 1);
+        // Get the homelander world position for the eyes
+        const eyeY = homelanderGroup.position.y + 1.35;
+        
+        // Two beam positions (left/right eye)
+        for (let side = -1; side <= 1; side += 2) {
+            const bx = homelanderGroup.position.x + side * 0.08;
+            const by = eyeY;
+            const bz = homelanderGroup.position.z + 0.2;
+            
+            // Laser direction: forward (-Z) and slightly downward
+            const dirZ = -1.0;
+            const dirY = -0.35;
+            const len = Math.sqrt(dirZ * dirZ + dirY * dirY);
+            const nz = dirZ / len;
+            const ny = dirY / len;
+            
+            // Create or reuse laser mesh
+            let beam = side === -1 ? laserLeftBeam : laserRightBeam;
+            if (!beam) {
+                const laserGeo = new THREE.CylinderGeometry(0.025, 0.08, laserLength, 4);
+                const laserMat = new THREE.MeshBasicMaterial({
+                    color: 0xFF2200,
+                    transparent: true,
+                    opacity: 0.85,
+                    blending: THREE.AdditiveBlending
+                });
+                beam = new THREE.Mesh(laserGeo, laserMat);
+                // Outer glow beam
+                const glowGeo = new THREE.CylinderGeometry(0.05, 0.15, laserLength, 4);
+                const glowMat = new THREE.MeshBasicMaterial({
+                    color: 0xFF0000,
+                    transparent: true,
+                    opacity: 0.2,
+                    blending: THREE.AdditiveBlending
+                });
+                const glow = new THREE.Mesh(glowGeo, glowMat);
+                beam.userData.glow = glow;
+                scene.add(glow);
+                scene.add(beam);
+                if (side === -1) laserLeftBeam = beam;
+                else laserRightBeam = beam;
+            }
+            
+            // Hide in first-person
+            if (state.firstPerson) {
+                beam.visible = false;
+                if (beam.userData.glow) beam.userData.glow.visible = false;
+                continue;
+            } else {
+                beam.visible = true;
+                if (beam.userData.glow) beam.userData.glow.visible = true;
+            }
+            
+            // Position beam at midpoint between start and end
+            const endX = bx;
+            const endY = by + ny * laserLength;
+            const endZ = bz + nz * laserLength;
+            const midX = (bx + endX) / 2;
+            const midY = (by + endY) / 2;
+            const midZ = (bz + endZ) / 2;
+            beam.position.set(midX, midY, midZ);
+            
+            // Rotate to face the direction (default cylinder is along Y)
+            const angle = Math.atan2(-dirZ, -dirY);
+            beam.rotation.x = angle;
+            
+            // Update glow
+            if (beam.userData.glow) {
+                beam.userData.glow.position.copy(beam.position);
+                beam.userData.glow.rotation.copy(beam.rotation);
+            }
+            
+            // Continuous pulse intensity
+            const pulse = 0.85 + Math.sin(state.gameTime * 8 + side) * 0.15;
+            beam.material.opacity = pulse;
+            if (beam.userData.glow) beam.userData.glow.material.opacity = pulse * 0.25;
+            
+            // Destroy obstacles in the beam path
+            for (let oi = state.obstacles.length - 1; oi >= 0; oi--) {
+                const obs = state.obstacles[oi];
+                const obsZ = obs.position.z;
+                if (obsZ > bz || obsZ < bz - laserLength) continue; // not in beam range
+                const dx = Math.abs(obs.position.x - bx);
+                if (dx > 0.7) continue; // not in beam width
+                // Check if beam Y reaches this obstacle's height
+                const fraction = (bz - obsZ) / laserLength;
+                const beamY = by - fraction * Math.abs(ny) * laserLength / Math.abs(nz);
+                const obsHeight = obs.userData.height || 0.6;
+                const obsTop = obs.position.y + obsHeight;
+                if (beamY < obsTop + 0.5 && beamY > obs.position.y - 0.3) {
+                    // Hit!
+                    disposeObject(obs);
+                    scene.remove(obs);
+                    state.obstacles.splice(oi, 1);
+                    spawnDestroyParticles(obs.position);
+                }
             }
         }
         
@@ -2347,60 +2467,31 @@
         state.gameOver = false;
     }
 
-    function fireLaser() {
-        if (!homelanderGroup) return;
-        // Don't render lasers in first-person view (they'd block the camera)
-        if (state.firstPerson) return;
-        const origin = homelanderGroup.position.clone();
-        origin.y += 1.2; // eye level
-        
-        // Two beams, slightly spread horizontally
-        for (let side = -1; side <= 1; side += 2) {
-            const beam = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.04, 0.15, 2.5, 6),
-                new THREE.MeshBasicMaterial({ 
-                    color: 0xFF2200,
-                    transparent: true,
-                    opacity: 0.9
+    function spawnDestroyParticles(pos) {
+        const colors = [0xFF4400, 0xFFAA00, 0xFF6600, 0xFFFF00];
+        for (let i = 0; i < 8; i++) {
+            const size = 0.08 + Math.random() * 0.12;
+            const particle = new THREE.Mesh(
+                new THREE.BoxGeometry(size, size, size),
+                new THREE.MeshBasicMaterial({
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    transparent: true
                 })
             );
-            beam.rotation.x = Math.PI / 2;
-            beam.position.copy(origin);
-            beam.position.x += side * 0.15;
-            
-            // Fire diagonally downward and forward
-            const vx = side * 0.05;
-            const vy = -0.15;
-            const vz = -0.25;
-            
-            scene.add(beam);
-            laserBeams.push({
-                mesh: beam,
-                vx: vx,
-                vy: vy,
-                vz: vz,
-                life: 1.0
+            particle.position.copy(pos);
+            particle.position.x += (Math.random() - 0.5) * 1.0;
+            particle.position.y += Math.random() * 0.5;
+            particle.position.z += (Math.random() - 0.5) * 1.0;
+            scene.add(particle);
+            const vx = (Math.random() - 0.5) * 0.3;
+            const vy = Math.random() * 0.3;
+            const vz = (Math.random() - 0.5) * 0.3;
+            state.particles.push({
+                mesh: particle,
+                vx: vx, vy: vy, vz: vz,
+                life: 1.0 + Math.random() * 0.5
             });
-            
-            // Lasers destroy obstacles they hit
-            for (const obs of state.obstacles) {
-                const dx = Math.abs(beam.position.x - obs.position.x);
-                const dz = Math.abs(beam.position.z - obs.position.z);
-                if (dx < 1.0 && dz < 2.0) {
-                    disposeObject(obs);
-                    scene.remove(obs);
-                }
-            }
         }
-        
-        // Red flash
-        const flash = new THREE.Mesh(
-            new THREE.SphereGeometry(0.3, 6, 6),
-            new THREE.MeshBasicMaterial({ color: 0xFF0000, transparent: true, opacity: 0.5 })
-        );
-        flash.position.copy(origin);
-        scene.add(flash);
-        setTimeout(() => scene.remove(flash), 100);
     }
 
     // ========== RENDER LOOP ==========
