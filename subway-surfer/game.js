@@ -2116,7 +2116,7 @@
         menuOverlay.style.display = 'flex';
         state.started = false;
         
-        window.__neoGame = { state, scene, camera, player, renderer, animate, restartGame, quitToMenu, togglePause };
+        window.__neoGame = { state, scene, camera, player, renderer, animate, restartGame, quitToMenu, togglePause, homelanderGroup };
         
         animate();
     }
