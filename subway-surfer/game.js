@@ -1067,12 +1067,7 @@
             // Open dev console with backtick/tilde
             if (e.key === '`' || e.key === '~') {
                 e.preventDefault();
-                if (state.started) {
-                    state.paused = true;
-                    document.getElementById('dev-console').style.display = 'flex';
-                    const ci = document.getElementById('console-input');
-                    if (ci) { ci.value = ''; ci.focus(); }
-                }
+                if (state.started) toggleConsole();
                 return;
             }
             
