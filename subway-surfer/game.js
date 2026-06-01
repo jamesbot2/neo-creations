@@ -1047,28 +1047,43 @@
             pauseMenuBtn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); quitToMenu(); });
         }
 
-        // Console input handler
+        // Console input handler (mobile-friendly: keydown + input + blur)
         const conInput = document.getElementById('console-input');
         if (conInput) {
+            function submitConsoleCommand() {
+                const val = conInput.value.trim().toLowerCase();
+                conInput.value = '';
+                document.getElementById('dev-console').style.display = 'none';
+                if (state.paused) state.paused = false;
+                if (val === 'homelander') {
+                    state.homelander = true;
+                    activateHomelander();
+                }
+                if (val === 'quit' && state.homelander) {
+                    deactivateHomelander();
+                }
+            }
+            
             conInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    const val = conInput.value.trim().toLowerCase();
-                    conInput.value = '';
-                    document.getElementById('dev-console').style.display = 'none';
-                    if (state.paused) state.paused = false;
-                    if (val === 'homelander') {
-                        state.homelander = true;
-                        activateHomelander();
-                    }
-                    if (val === 'quit' && state.homelander) {
-                        deactivateHomelander();
-                    }
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    e.preventDefault();
+                    submitConsoleCommand();
                 }
                 if (e.key === 'Escape') {
                     document.getElementById('dev-console').style.display = 'none';
                     if (state.paused) state.paused = false;
                 }
                 e.stopPropagation();
+            });
+            // Mobile virtual keyboard fallback: input event detects newline
+            conInput.addEventListener('input', () => {
+                if (conInput.value.includes('\n')) {
+                    submitConsoleCommand();
+                }
+            });
+            // Blur fallback: pressing Done/Go on mobile keyboard (only if text exists)
+            conInput.addEventListener('blur', () => {
+                if (conInput.value.trim()) submitConsoleCommand();
             });
         }
         
