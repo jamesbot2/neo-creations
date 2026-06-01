@@ -1119,15 +1119,22 @@
         // Keyboard
         document.addEventListener('keydown', (e) => {
             keys[e.key] = true;
+            // keyCode fallback for non-standard keyboard layouts
+            if (e.keyCode) { keys['_kc_' + e.keyCode] = true; }
             
             // Start game from menu
             // Homelander direct movement (instant, held key = continuous smooth)
             if (state.homelander && homelanderGroup) {
                 const hlSpeed = 0.25;
-                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { homelanderGroup.position.x -= hlSpeed; e.preventDefault(); }
-                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { homelanderGroup.position.x += hlSpeed; e.preventDefault(); }
-                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { homelanderGroup.position.y = Math.min(20, homelanderGroup.position.y + hlSpeed); e.preventDefault(); }
-                if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { homelanderGroup.position.y = Math.max(1, homelanderGroup.position.y - hlSpeed); e.preventDefault(); }
+                const k = e.key, kc = e.keyCode || e.which;
+                const isLeft = k === 'ArrowLeft' || k === 'a' || k === 'A' || kc === 37 || kc === 65;
+                const isRight = k === 'ArrowRight' || k === 'd' || k === 'D' || kc === 39 || kc === 68;
+                const isUp = k === 'ArrowUp' || k === 'w' || k === 'W' || kc === 38 || kc === 87;
+                const isDown = k === 'ArrowDown' || k === 's' || k === 'S' || kc === 40 || kc === 83;
+                if (isLeft) { homelanderGroup.position.x -= hlSpeed; e.preventDefault(); }
+                if (isRight) { homelanderGroup.position.x += hlSpeed; e.preventDefault(); }
+                if (isUp) { homelanderGroup.position.y = Math.min(20, homelanderGroup.position.y + hlSpeed); e.preventDefault(); }
+                if (isDown) { homelanderGroup.position.y = Math.max(1, homelanderGroup.position.y - hlSpeed); e.preventDefault(); }
             }
             // Escape: close console first, then pause
             if (e.key === 'Escape') {
