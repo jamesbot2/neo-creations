@@ -85,7 +85,9 @@
         jetpackCooldown: 0,
         canRoofWalk: false,
         theme: 0,
-        jumpingFromRoof: false
+        jumpingFromRoof: false,
+        rolledLand: false,
+        rolledLandTime: 0
     };
 
     // ========== THREE.JS SETUP ==========
@@ -1539,11 +1541,11 @@
         }
         
         state.isJumping = true;
-        // If was rolling, cancel the roll immediately and jump
+        // If was rolling: stay squished during the jump, land back in squat
+        // Roll persists so the player visually stays in crouch pose
         if (state.isRolling) {
-            state.isRolling = false;
-            state.targetPlayerHeight = PLAYER_Y;
-            player.scale.y += (1 - player.scale.y) * 0.8; // instant unsquish
+            state.rollEndTime = Date.now() + 99999; // keep rolling indefinitely
+            state.targetPlayerHeight = ROLL_HEIGHT;
         }
         // If on a roof, jump off it - keep current height and set jumpingFromRoof
         if (state.onRoof) {
@@ -1958,13 +1960,17 @@
         } catch(e) {}
         saveShopData();
         
-        // Add earned credits info to game over screen
+        // Add earned credits info to game over screen (remove old first)
+        const oldCredits = document.getElementById('credits-earned');
+        if (oldCredits) oldCredits.remove();
         const creditsInfo = document.createElement('div');
+        creditsInfo.id = 'credits-earned';
         creditsInfo.className = 'final-coins';
         creditsInfo.style.color = '#FFD700';
         creditsInfo.style.fontSize = '14px';
         creditsInfo.textContent = '+ ' + earned + ' credits (' + multiplier + 'x)';
-        gameOverEl.querySelector('.final-coins').after(creditsInfo);
+        const refEl = gameOverEl.querySelector('.final-coins');
+        if (refEl) refEl.after(creditsInfo);
         
         gameOverEl.classList.add('visible');
         // Show best score
@@ -2139,7 +2145,11 @@
                 state.hasDoubleJumped = false;
                 state.jumpingFromRoof = false;
                 state.jumpVelocity = 0;
-                // Landing while rolling: keep sliding (release down key to stand)
+                // Roll-jump landing: stay in squat for a moment
+                if (state.isRolling && !state.rolledLand) {
+                    state.rolledLand = true;
+                    state.rolledLandTime = Date.now();
+                }
                 // If jetpack was active, start cooldown
                 if (state.canJetpack && state.jetpackFuel <= 0 && state.jetpackCooldown <= 0) {
                     // Already handled above
@@ -2147,8 +2157,8 @@
             }
         }
 
-        // Roll height - tuck in air, slide on ground
-        if (state.isRolling && !state.isJumping) {
+        // Roll height - tuck in air OR on ground
+        if (state.isRolling) {
             state.playerHeight += (state.targetPlayerHeight - state.playerHeight) * 0.2;
             if (Math.abs(state.playerHeight - state.targetPlayerHeight) < 0.01) {
                 state.playerHeight = state.targetPlayerHeight;
@@ -2163,23 +2173,30 @@
         // Apply player height
         player.position.y = state.playerHeight;
 
-        // Scale for roll (visual squash - even in air)
+        // Scale for roll (visual squash - always applied, even during jump)
         if (state.isRolling) {
             const scaleY = (ROLL_HEIGHT + 0.2) / (PLAYER_Y + 0.2);
             player.scale.y = 1 - (1 - scaleY) * 0.7;
-            if (!state.isJumping) player.position.y = state.playerHeight;
+            player.position.y = state.playerHeight; // stay low even when jumping
         } else {
             player.scale.y += (1 - player.scale.y) * 0.15;
         }
         
-        // Release roll when down key not held (with min 350ms swipe duration)
+        // Release roll when down key not held
+        // Roll-jump: lands in squat, auto-stands after a short delay
         if (state.isRolling && !state.isJumping) {
             const now = Date.now();
             const downHeld = keys['ArrowDown'] || keys['s'] || keys['S'];
             if (downHeld) {
-                state.rollEndTime = now + 100; // extend while held
+                state.rollEndTime = now + 200;
+                state.rolledLand = false;
+            } else if (state.rolledLand && now > state.rolledLandTime + 400) {
+                // Roll-jump landing: stayed in squat for 400ms, now stand
+                state.isRolling = false;
+                state.targetPlayerHeight = PLAYER_Y;
+                state.rolledLand = false;
             } else if (now < state.rollEndTime) {
-                // Still within minimum roll duration (from swipe)
+                // Still in min roll duration (from swipe or roll-jump)
             } else {
                 state.isRolling = false;
                 state.targetPlayerHeight = PLAYER_Y;
