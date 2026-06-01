@@ -118,10 +118,8 @@
         SG.account.loggedIn = false;
         localStorage.removeItem('subwayToken');
         localStorage.removeItem('subwayEmail');
-        var btn = document.getElementById('account-btn-menu');
-        if (btn) btn.textContent = '🔑 SIGN IN';
-        if (SG.menuOverlay) SG.menuOverlay.style.display = 'none';
-        SG.showLogin(true);
+        localStorage.removeItem('subwayRemember');
+        window.location.href = 'http://' + window.location.hostname + ':3000/';
     };
 
     SG.accountSave = function() {
