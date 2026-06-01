@@ -153,6 +153,10 @@
         }).catch(function() {});
     };
 
+    SG.accountSaveVol = function() {
+        // Volume is already saved in localStorage by oninput handler
+    };
+
     SG.loadAccountData = function() {
         if (!SG.account.loggedIn || !SG.account.token) return;
         fetch('http://' + window.location.hostname + ':3000/api/load', {
@@ -176,6 +180,9 @@
     };
 
     SG.showProfile = function() {
+        // Load fresh data from server first
+        SG.loadAccountData();
+
         var overlay = document.getElementById('profile-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
@@ -186,8 +193,7 @@
         overlay.style.display = 'flex';
 
         var s = SG.state;
-        // Refresh account email from localStorage
-        SG.account.email = SG.account.email || localStorage.getItem('subwayEmail');
+        SG.account.email = localStorage.getItem('subwayEmail');
         var names = {0:'None',1:'Double Jump',2:'Jetpack',3:'Roof Walk'};
         var ability = names[s.equippedAbility] || 'None';
         var owned = [];

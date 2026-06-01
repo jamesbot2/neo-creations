@@ -35,6 +35,14 @@
     };
 
     SG.showShop = function() {
+        // Always read volume from localStorage for persistence
+        var v = {
+            music: parseFloat(localStorage.getItem('subwayMusicVol') || '0.5'),
+            sfx: parseFloat(localStorage.getItem('subwaySfxVol') || '0.8')
+        };
+        SG.state.musicVolume = v.music;
+        SG.state.sfxVolume = v.sfx;
+
         if (!SG.shopOverlay) {
             SG.shopOverlay = document.createElement('div');
             SG.shopOverlay.id = 'shop-overlay';
