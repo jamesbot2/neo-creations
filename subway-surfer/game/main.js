@@ -530,6 +530,40 @@
         // Theme change
         SG.checkThemeChange();
 
+        // Background color changes with speed
+        var speedLvl = Math.floor((SG.state.speed - SG.START_SPEED) / (SG.MAX_SPEED - SG.START_SPEED) * 49) + 1;
+        var speedRatio = Math.min(SG.state.speed / SG.MAX_SPEED, 1.0);
+        var inCyber = speedLvl >= 48;
+        if (inCyber !== SG.state.cyberMode) {
+            SG.state.cyberMode = inCyber;
+            SG.applyCyberColors(inCyber);
+        }
+        if (inCyber) {
+            SG.scene.background.setHex(0x000000);
+            SG.scene.fog.color.setHex(0x000000);
+            SG.scene.fog.near = 25;
+            SG.scene.fog.far = 70;
+        } else if (speedRatio < 0.3) {
+            SG.scene.background.setHex(0x87CEEB);
+            SG.scene.fog.color.setHex(0x87CEEB);
+            SG.scene.fog.near = 60;
+            SG.scene.fog.far = 120;
+        } else if (speedRatio < 0.6) {
+            var t = (speedRatio - 0.3) / 0.3;
+            var r = Math.round(0x87 * (1-t) + 0xFF * t);
+            var g = Math.round(0xCE * (1-t) + 0x99 * t);
+            var b = Math.round(0xEB * (1-t) + 0x33 * t);
+            SG.scene.background.setRGB(r/255, g/255, b/255);
+            SG.scene.fog.color.copy(SG.scene.background);
+        } else {
+            var t2 = Math.min((speedRatio - 0.6) / 0.4, 1.0);
+            var r2 = Math.round(0xFF * (1-t2) + 0x55 * t2);
+            var g2 = Math.round(0x99 * (1-t2) + 0x11 * t2);
+            var b2 = Math.round(0x33 * (1-t2) + 0x11 * t2);
+            SG.scene.background.setRGB(r2/255, g2/255, b2/255);
+            SG.scene.fog.color.copy(SG.scene.background);
+        }
+
         // Police chase: start after 100m
         if (!SG.state.policeChasing && SG.state.policeTotalDistance > 200 && !SG.state.gameOver && !SG.state.homelander) {
             SG.startPoliceChase();
