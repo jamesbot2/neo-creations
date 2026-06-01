@@ -142,6 +142,7 @@
     function createPlayer() {
         player = new THREE.Group();
         player.position.set(0, 0, 0);
+        player.rotation.y = Math.PI; // face -Z (away from camera)
 
         const bodyMat = new THREE.MeshLambertMaterial({ color: 0x2255aa });
         playerBody = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.4), bodyMat);
@@ -1213,6 +1214,8 @@
 
     function handleKeyInput(key) {
         if (state.gameOver || !state.started) return;
+        // Homelander uses arrow keys for flight, not lane switching
+        if (state.homelander && (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown')) return;
 
         if (!audioCtx) initAudio();
 
@@ -1282,6 +1285,8 @@
 
     // ========== COLLISION DETECTION ==========
     function checkCollisions() {
+        // Homelander: invincible, no collisions
+        if (state.homelander) return false;
         const playerPos = player.position;
         const playerHitbox = {
             x: playerPos.x,
@@ -1767,6 +1772,9 @@
         spawnObstacles();
         spawnBuildings();
 
+        // Homelander - override game over
+        if (state.homelander) state.gameOver = false;
+        
         // Collision detection
         if (checkCollisions()) {
             gameOver();
