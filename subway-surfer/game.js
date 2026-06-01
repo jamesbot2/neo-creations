@@ -1073,6 +1073,11 @@
             keys[e.key] = true;
             
             // Start game from menu
+            // Close console with Escape
+            if (e.key === 'Escape' && document.getElementById('dev-console')?.style?.display === 'flex') {
+                toggleConsole();
+                return;
+            }
             // Open dev console with backtick/tilde
             if (e.key === '`' || e.key === '~') {
                 e.preventDefault();
