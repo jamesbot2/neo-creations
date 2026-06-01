@@ -1784,26 +1784,26 @@
     }
 
     function updateCamera() {
-        if (!player || !camera) return;
+        if (!camera) return;
         
-        if (isNaN(player.position.x)) player.position.x = 0;
-        if (isNaN(player.position.y)) player.position.y = PLAYER_Y;
-        if (isNaN(player.position.z)) player.position.z = 0;
+        // Use Homelander position when in easter egg mode
+        const camTarget = (state.homelander && homelanderGroup) ? homelanderGroup.position : (player ? player.position : null);
+        if (!camTarget) return;
+
+        if (isNaN(camTarget.x)) camTarget.x = 0;
+        if (isNaN(camTarget.y)) camTarget.y = 1;
+        if (isNaN(camTarget.z)) camTarget.z = 0;
 
         if (state.firstPerson) {
-            // Eye follows player Y (jump up, roll down)
-            const eyeY = player.position.y + (state.isRolling ? 0.3 : 1.3);
-            const eyeZ = player.position.z + 0.5;
-            camera.position.set(player.position.x, eyeY, eyeZ);
-            const lookY = player.position.y + 0.3;
-            camera.lookAt(player.position.x, lookY, player.position.z - 30);
-            // Hide player model
+            const eyeY = camTarget.y + 1.3;
+            const eyeZ = camTarget.z + 0.5;
+            camera.position.set(camTarget.x, eyeY, eyeZ);
+            camera.lookAt(camTarget.x, camTarget.y + 0.3, camTarget.z - 30);
             if (player) player.visible = false;
         } else {
-            // Third person: camera behind and above
-            const targetX = player.position.x;
-            const targetY = state.isRolling ? 5 : 5.5;
-            const targetZ = player.position.z + 7;
+            const targetX = camTarget.x;
+            const targetY = camTarget.y + 5;
+            const targetZ = camTarget.z + 7;
             let shakeX = 0, shakeY = 0;
             if (state.cameraShake > 0.01) {
                 shakeX = (Math.random() - 0.5) * state.cameraShake * 0.3;
@@ -1812,9 +1812,8 @@
             camera.position.x += (targetX + shakeX - camera.position.x) * 0.1;
             camera.position.y += (targetY + shakeY - camera.position.y) * 0.1;
             camera.position.z += (targetZ - camera.position.z) * 0.1;
-            camera.lookAt(player.position.x, 0, player.position.z - 10);
-            // Show player model
-            if (player) player.visible = true;
+            camera.lookAt(camTarget.x, camTarget.y - 1, camTarget.z - 10);
+            if (player && !state.homelander) player.visible = true;
         }
     }
 
