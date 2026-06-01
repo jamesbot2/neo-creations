@@ -1121,20 +1121,26 @@
             keys[e.key] = true;
             
             // Start game from menu
-            // Homelander direct movement (bypasses the update loop for instant response)
+            // Homelander direct movement (instant, no delay)
             if (state.homelander && homelanderGroup) {
-                // Each keypress moves by 0.6 (held keys repeat, held=continuous smooth motion)
                 if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') homelanderGroup.position.x -= 0.6;
                 if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') homelanderGroup.position.x += 0.6;
                 if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') homelanderGroup.position.y = Math.min(20, homelanderGroup.position.y + 0.6);
                 if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') homelanderGroup.position.y = Math.max(1, homelanderGroup.position.y - 0.6);
-                // Prevent lane switching in HL mode
                 e.preventDefault();
+                return; // Stop all further key processing
             }
-            // Close console with Escape
-            if (e.key === 'Escape' && document.getElementById('dev-console')?.style?.display === 'flex') {
-                toggleConsole();
-                return;
+            // Escape: close console first, then pause
+            if (e.key === 'Escape') {
+                const devCon = document.getElementById('dev-console');
+                if (devCon && devCon.style.display === 'flex') {
+                    toggleConsole();
+                    return;
+                }
+                if (state.started && !state.gameOver) {
+                    togglePause();
+                    return;
+                }
             }
             // Open dev console with backtick/tilde
             if (e.key === '`' || e.key === '~') {
@@ -1148,11 +1154,7 @@
                 return;
             }
             
-            // Pause toggle
-            if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && state.started && !state.gameOver) {
-                togglePause();
-                return;
-            }
+
             // Return to menu (M key)
             if ((e.key === 'm' || e.key === 'M') && state.started) {
                 if (!state.gameOver) {
@@ -1398,7 +1400,12 @@
             con.style.display = 'flex';
             state.paused = true;
             const ci = document.getElementById('console-input');
-            if (ci) { ci.value = ''; ci.focus(); }
+            if (ci) {
+                ci.value = '';
+                ci.focus();
+                // Force keyboard on mobile (re-focus after a tick)
+                setTimeout(() => ci.focus(), 100);
+            }
         }
     }
 
@@ -1817,7 +1824,10 @@
             camera.position.set(camTarget.x, eyeY, eyeZ);
             camera.lookAt(camTarget.x, camTarget.y + 0.3, camTarget.z - 30);
             if (player) player.visible = false;
+            // Hide Homelander model in FPV so it doesn't block the view
+            if (homelanderGroup) homelanderGroup.visible = false;
         } else {
+            if (homelanderGroup) homelanderGroup.visible = true;
             const targetX = camTarget.x;
             const targetY = camTarget.y + 5;
             const targetZ = camTarget.z + 7;
