@@ -175,6 +175,48 @@
         SG.accountSave();
     };
 
+    SG.showProfile = function() {
+        var overlay = document.getElementById('profile-overlay');
+        if (overlay) { overlay.style.display = 'flex'; return; }
+
+        overlay = document.createElement('div');
+        overlay.id = 'profile-overlay';
+        overlay.className = 'overlay';
+        overlay.style.display = 'flex';
+
+        var s = SG.state;
+        var names = {0:'None',1:'Double Jump',2:'Jetpack',3:'Roof Walk'};
+        var ability = names[s.equippedAbility] || 'None';
+        var owned = [];
+        if (s.canDoubleJump) owned.push('Double Jump');
+        if (s.canJetpack) owned.push('Jetpack');
+        if (s.canRoofWalk) owned.push('Roof Walk');
+
+        var html = '<div class="menu-content" style="max-width:380px;text-align:left;">';
+        html += '<h1 class="menu-title" style="font-size:24px;text-align:center;margin-bottom:10px;">👤 PROFILE</h1>';
+        html += '<div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:15px;margin-bottom:10px;">';
+        html += '<div style="margin:4px 0;"><b style="color:#aaa;">Email:</b> ' + (SG.account.email || '-') + '</div>';
+        html += '<div style="margin:4px 0;"><b style="color:#aaa;">Credits:</b> <span style="color:#FFD700;">' + (s.credits || 0) + '</span></div>';
+        html += '<div style="margin:4px 0;"><b style="color:#aaa;">Coins:</b> <span style="color:#FFD700;">' + (s.coins || 0) + '</span></div>';
+        html += '<div style="margin:4px 0;"><b style="color:#aaa;">Equipped:</b> ' + ability + '</div>';
+        html += '<div style="margin:4px 0;"><b style="color:#aaa;">Owned:</b> ' + (owned.length ? owned.join(', ') : 'None') + '</div>';
+        html += '<div style="margin:4px 0;"><b style="color:#aaa;">Runs:</b> ' + (s.runCount || 0) + '</div>';
+        html += '</div>';
+
+        html += '<div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:15px;">';
+        html += '<div style="font-weight:bold;margin-bottom:8px;">🏆 Best Distances</div>';
+        html += '<div style="margin:3px 0;"><span style="color:#4CAF50;">■</span> Easy: <b>' + (s.maxEasy || 0) + 'm</b></div>';
+        html += '<div style="margin:3px 0;"><span style="color:#FFC107;">■</span> Medium: <b>' + (s.maxMedium || 0) + 'm</b></div>';
+        html += '<div style="margin:3px 0;"><span style="color:#F44336;">■</span> Hard: <b>' + (s.maxHard || 0) + 'm</b></div>';
+        html += '</div>';
+
+        html += '<div class="menu-btn" onclick="document.getElementById(\'profile-overlay\').style.display=\'none\'" style="margin-top:12px;text-align:center;">CLOSE</div>';
+        html += '</div>';
+
+        overlay.innerHTML = html;
+        document.body.appendChild(overlay);
+    };
+
     // Auto-save every 30s
     setInterval(function() {
         if (SG.account.loggedIn && SG.state && SG.state.started && !SG.state.gameOver) SG.accountSave();
