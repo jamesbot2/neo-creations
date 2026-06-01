@@ -1,4 +1,4 @@
-// ===== SUBWAY SURFER - Account Server v2 =====
+// ===== SUBWAY SURFER - Account Server v3 =====
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -9,6 +9,9 @@ const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// In-memory verification codes (email -> {code, expires})
+var verifyCodes = {};
 
 function readDB(file) {
     try { if (!fs.existsSync(file)) return {}; return JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) { return {}; }
@@ -28,11 +31,17 @@ function verifyPassword(password, storedHash, salt) {
 }
 
 function generateToken() { return crypto.randomBytes(32).toString('hex'); }
+function generateCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
 function validateEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
 
 function sendJSON(res, status, data) {
     res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' });
     res.end(JSON.stringify(data));
+}
+
+function sendHTML(res, html) {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(html);
 }
 
 function parseBody(req) {
@@ -56,6 +65,17 @@ function getAuthUser(headers) {
     return null;
 }
 
+function serveStatic(res, filePath, contentType) {
+    try {
+        const data = fs.readFileSync(filePath);
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(data);
+    } catch(e) {
+        res.writeHead(404);
+        res.end('Not found');
+    }
+}
+
 function getServerIP() {
     const interfaces = require('os').networkInterfaces();
     for (const name in interfaces) {
@@ -66,18 +86,8 @@ function getServerIP() {
     return 'localhost';
 }
 
-// ===== DEFAULT GAME DATA =====
 function defaultGameData() {
-    return {
-        coins: 0,
-        credits: 0,
-        equippedAbility: 0,
-        ownedAbilities: [0], // 0 = none
-        maxDistance: 0,
-        runCount: 0,
-        highScore: 0,
-        totalCoins: 0
-    };
+    return { coins: 0, credits: 0, equippedAbility: 0, ownedAbilities: [0], maxDistance: 0, runCount: 0, highScore: 0, totalCoins: 0 };
 }
 
 async function handleRequest(req, res) {
@@ -87,36 +97,53 @@ async function handleRequest(req, res) {
 
     if (method === 'OPTIONS') { sendJSON(res, 200, {}); return; }
 
-    // ---- ADMIN PANEL ----
-    if (pathname === '/admin' && method === 'GET') {
-        const users = getUsers();
-        let html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Subway Surfer - Admin</title>';
-        html += '<style>body{font-family:Arial;background:#1a1a2e;color:#fff;padding:20px}table{border-collapse:collapse;width:100%}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #333}th{background:#16213e;color:#ffd700}tr:hover{background:#0f3460}h1{color:#ff6600}.badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;margin:1px}.ability{background:#4CAF50;color:#fff}.no-ability{background:#555}</style></head><body>';
-        html += '<h1>🚄 Subway Surfer - Admin Panel</h1>';
-        html += '<p style="color:#aaa;">' + Object.keys(users).length + ' registered users</p>';
-        html += '<table><tr><th>Email</th><th>Max Distance</th><th>Coins</th><th>Credits</th><th>Runs</th><th>Abilities</th><th>Joined</th></tr>';
-
-        const sorted = Object.values(users).sort((a, b) => (b.gameData?.maxDistance || 0) - (a.gameData?.maxDistance || 0));
-
-        const abilityNames = {0:'None',1:'Double Jump',2:'Jetpack',3:'Roof Walk'};
-        for (const user of sorted) {
-            const gd = user.gameData || defaultGameData();
-            const abilities = (gd.ownedAbilities || [0]).map(a => abilityNames[a] || 'Unknown').join(', ');
-            const joined = new Date(user.createdAt || 0).toLocaleDateString();
-            html += '<tr><td>' + user.email + '</td><td>' + (gd.maxDistance || 0) + 'm</td><td>' + (gd.coins || 0) + '</td><td>' + (gd.credits || 0) + '</td><td>' + (gd.runCount || 0) + '</td><td>' + abilities + '</td><td>' + joined + '</td></tr>';
-        }
-
-        html += '</table></body></html>';
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(html);
+    // ---- STATIC FILES (serve signin.html, game.html, game/ etc.) ----
+    if (method === 'GET' && (pathname === '/game.html' || pathname === '/signin.html' || pathname.startsWith('/game/') || pathname === '/style.css' || pathname === '/index.html')) {
+        const root = path.join(__dirname, '..');
+        let filePath = root + pathname;
+        if (pathname === '/') filePath = root + '/signin.html';
+        const ext = path.extname(filePath);
+        const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.svg': 'image/svg+xml' };
+        serveStatic(res, filePath, mime[ext] || 'application/octet-stream');
         return;
     }
 
-    // ---- ROOT ----
+    // ---- ROOT: serve signin page ----
     if (pathname === '/' && method === 'GET') {
-        const ip = getServerIP();
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end('<h2>Subway Surfer - Account API</h2><p>Endpoints:</p><ul><li>POST /api/register</li><li>POST /api/login</li><li>POST /api/save</li><li>GET /api/load</li><li>GET /api/leaderboard</li></ul><p><a href="/admin">Admin Panel</a> | <a href="http://' + ip + ':8080/">Play Game</a></p>');
+        const signinPath = path.join(__dirname, '..', 'signin.html');
+        serveStatic(res, signinPath, 'text/html');
+        return;
+    }
+
+    // ---- ADMIN PANEL ----
+    if (pathname === '/admin' && method === 'GET') {
+        const users = getUsers();
+        let html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Admin</title>';
+        html += '<style>body{font-family:Arial;background:#1a1a2e;color:#fff;padding:20px}table{border-collapse:collapse;width:100%}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #333}th{background:#16213e;color:#ffd700}tr:hover{background:#0f3460}h1{color:#ff6600}</style></head><body>';
+        html += '<h1>🚄 Admin Panel</h1><p style="color:#aaa;">' + Object.keys(users).length + ' users | ';
+        html += '<a href="/verify-codes" style="color:#ffaa00;">View Verify Codes</a></p>';
+        html += '<table><tr><th>Email</th><th>Max Dist</th><th>Coins</th><th>Credits</th><th>Runs</th><th>Abilities</th><th>Joined</th></tr>';
+        const sorted = Object.values(users).sort((a, b) => (b.gameData?.maxDistance || 0) - (a.gameData?.maxDistance || 0));
+        const abilityNames = {0:'None',1:'Double Jump',2:'Jetpack',3:'Roof Walk'};
+        for (const user of sorted) {
+            const gd = user.gameData || defaultGameData();
+            const abilities = (gd.ownedAbilities || [0]).map(a => abilityNames[a] || '?').join(', ');
+            html += '<tr><td>' + user.email + '</td><td>' + (gd.maxDistance || 0) + 'm</td><td>' + (gd.coins || 0) + '</td><td>' + (gd.credits || 0) + '</td><td>' + (gd.runCount || 0) + '</td><td>' + abilities + '</td><td>' + new Date(user.createdAt || 0).toLocaleDateString() + '</td></tr>';
+        }
+        html += '</table></body></html>';
+        sendHTML(res, html);
+        return;
+    }
+
+    // ---- SHOW VERIFY CODES ----
+    if (pathname === '/verify-codes' && method === 'GET') {
+        let html = '<h2>Pending Verification Codes</h2><table><tr><th>Email</th><th>Code</th><th>Expires</th></tr>';
+        for (const email in verifyCodes) {
+            const c = verifyCodes[email];
+            html += '<tr><td>' + email + '</td><td><b>' + c.code + '</b></td><td>' + new Date(c.expires).toLocaleString() + '</td></tr>';
+        }
+        html += '</table><p><a href="/admin">Back</a></p>';
+        sendHTML(res, html);
         return;
     }
 
@@ -132,19 +159,54 @@ async function handleRequest(req, res) {
         const users = getUsers();
         if (users[email]) { sendJSON(res, 409, { error: 'Email already registered' }); return; }
 
+        // Generate verification code
+        const code = generateCode();
+        verifyCodes[email] = { code, expires: Date.now() + 10 * 60 * 1000 }; // 10 min expiry
+
+        // Store user with unverified flag
         const { hash, salt } = hashPassword(password);
         users[email] = {
-            email,
-            passwordHash: hash,
-            passwordSalt: salt,
-            createdAt: Date.now(),
-            verified: true, // auto-verify for now
+            email, passwordHash: hash, passwordSalt: salt,
+            verified: false, createdAt: Date.now(),
             gameData: defaultGameData()
         };
         saveUsers(users);
 
-        console.log('[REGISTER] ' + email);
-        sendJSON(res, 201, { message: 'Registration successful! You can now log in.', email });
+        console.log('\n=== VERIFICATION CODE ===');
+        console.log('Email: ' + email);
+        console.log('Code:  ' + code);
+        console.log('=========================\n');
+
+        sendJSON(res, 201, { message: 'Verification code sent to your email', email });
+        return;
+    }
+
+    // ---- VERIFY CODE ----
+    if (pathname === '/api/verify-code' && method === 'POST') {
+        const body = await parseBody(req);
+        const { email, code } = body;
+
+        if (!email || !code) { sendJSON(res, 400, { error: 'Email and code required' }); return; }
+
+        const stored = verifyCodes[email];
+        if (!stored) { sendJSON(res, 400, { error: 'No code found for this email. Register first.' }); return; }
+        if (Date.now() > stored.expires) {
+            delete verifyCodes[email];
+            sendJSON(res, 400, { error: 'Code expired. Register again.' });
+            return;
+        }
+        if (stored.code !== code) { sendJSON(res, 400, { error: 'Invalid code' }); return; }
+
+        // Mark user as verified
+        delete verifyCodes[email];
+        const users = getUsers();
+        if (users[email]) {
+            users[email].verified = true;
+            saveUsers(users);
+        }
+
+        console.log('[VERIFIED] ' + email);
+        sendJSON(res, 200, { message: 'Email verified! You can now log in.' });
         return;
     }
 
@@ -157,6 +219,10 @@ async function handleRequest(req, res) {
         const user = users[email];
         if (!user || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
             sendJSON(res, 401, { error: 'Invalid email or password' });
+            return;
+        }
+        if (!user.verified) {
+            sendJSON(res, 403, { error: 'Please verify your email first (check code)' });
             return;
         }
 
@@ -209,16 +275,12 @@ async function handleRequest(req, res) {
     // ---- LEADERBOARD ----
     if (pathname === '/api/leaderboard' && method === 'GET') {
         const users = getUsers();
-        const leaderboard = Object.values(users)
-            .filter(u => u.verified !== false)
-            .map(u => ({
-                email: u.email.replace(/(.{3}).+(@)/, '$1***$2'),
-                maxDistance: (u.gameData && u.gameData.maxDistance) || 0,
-                totalCoins: (u.gameData && u.gameData.totalCoins) || 0
-            }))
-            .sort((a, b) => b.maxDistance - a.maxDistance)
-            .slice(0, 100);
-        sendJSON(res, 200, { leaderboard });
+        const lb = Object.values(users).filter(u => u.verified).map(u => ({
+            email: u.email.replace(/(.{3}).+(@)/, '$1***$2'),
+            maxDistance: (u.gameData && u.gameData.maxDistance) || 0,
+            totalCoins: (u.gameData && u.gameData.totalCoins) || 0
+        })).sort((a, b) => b.maxDistance - a.maxDistance).slice(0, 100);
+        sendJSON(res, 200, { leaderboard: lb });
         return;
     }
 
@@ -227,6 +289,9 @@ async function handleRequest(req, res) {
 
 const server = http.createServer(handleRequest);
 server.listen(PORT, '0.0.0.0', () => {
-    console.log('✓ Account server v2 running on port ' + PORT);
-    console.log('  Admin: http://' + getServerIP() + ':' + PORT + '/admin');
+    console.log('✓ Account server v3 running on port ' + PORT);
+    console.log('  Game: http://' + getServerIP() + ':8080/');
+    console.log('  Sign in: http://' + getServerIP() + ':3000/');
+    console.log('  Admin: http://' + getServerIP() + ':3000/admin');
+    console.log('  Codes: http://' + getServerIP() + ':3000/verify-codes');
 });
