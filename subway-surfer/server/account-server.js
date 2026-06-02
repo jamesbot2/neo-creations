@@ -136,7 +136,7 @@ async function handleRequest(req, res) {
     if (method === 'OPTIONS') { sendJSON(res, 200, {}); return; }
 
     // ---- STATIC FILES (serve signin.html, game.html, game/ etc.) ----
-    if (method === 'GET' && (pathname === '/game.html' || pathname === '/signin.html' || pathname.startsWith('/game/') || pathname === '/style.css' || pathname === '/index.html')) {
+    if ((method === 'GET' || method === 'HEAD') && (pathname === '/game.html' || pathname === '/game.js' || pathname.startsWith('/game/') || pathname.startsWith('/game.js?') || pathname === '/signin.html' || pathname === '/style.css' || pathname === '/index.html')) {
         const root = path.join(__dirname, '..');
         let filePath = root + pathname;
         if (pathname === '/') filePath = root + '/signin.html';
@@ -288,6 +288,7 @@ h += '</script></body></html>';
 
         if (!email || !password || !username) { sendJSON(res, 400, { error: 'Email, username and password required' }); return; }
         if (username.length < 2 || username.length > 16) { sendJSON(res, 400, { error: 'Username must be 2-16 characters' }); return; }
+        const users = getUsers();
         // Check unique username
         for (var ue in users) { if (users[ue].username === username) { sendJSON(res, 400, { error: 'Username already taken' }); return; } }
         if (!captchaId || !captchaAnswer) { sendJSON(res, 400, { error: 'Captcha required' }); return; }
@@ -307,7 +308,6 @@ h += '</script></body></html>';
         }
         delete captchaStore[captchaId];
 
-        const users = getUsers();
         if (users[email]) { sendJSON(res, 409, { error: 'Email already registered' }); return; }
 
         // Generate verification code
