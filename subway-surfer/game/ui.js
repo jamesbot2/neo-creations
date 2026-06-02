@@ -49,9 +49,7 @@
             SG.shopOverlay.className = 'overlay';
             SG.shopOverlay.onclick = function(e) { if (e.target === SG.shopOverlay) SG.shopOverlay.style.display = 'none'; };
         }
-        }
-
-        var owned = [false, SG.state.canDoubleJump, SG.state.canJetpack, SG.state.canRoofWalk];
+        // showShop continues below...
         var prices = [0, 10000, 50000, 100000];
         var names = ['None', 'Double Jump', 'Jetpack', 'Roof Walk'];
         var descs = ['No ability equipped', 'Double jump in mid-air', 'Fly for 30s every 15s cooldown', 'Walk on top of obstacles'];
@@ -132,6 +130,8 @@
             SG.toggleMute();
             SG.showShop();
         };
+
+    };  // end showShop
 
     SG.updateMenuCredits = function() {
         var el = document.getElementById('menu-credits');
