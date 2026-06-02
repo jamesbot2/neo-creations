@@ -584,7 +584,33 @@ input[type=range]::-moz-range-thumb {
     text-align: center;
 }
 
+/* Mobile responsive optimizations for overlays */
 @media (max-width: 480px) {
+    .menu-title { font-size: 28px !important; }
+    .menu-content { padding: 20px 12px !important; max-width: 95vw !important; }
+    .tap-to-start { font-size: 16px; padding: 10px 24px; }
+    .diff-btn { font-size: 11px; padding: 5px 12px; }
+    #menu-credits { font-size: 14px; }
+    .menu-btn { font-size: 12px !important; padding: 6px 10px !important; }
+    input[type=range] { width: 70px; }
+    /* Ensure overlays are scrollable on mobile */
+    .overlay .menu-content { max-height: 80vh; overflow-y: auto; }
+    /* Game HUD */
+    #score-display { font-size: 14px; padding: 4px 10px; top: 8px; }
+    #pause-btn { width: 32px; height: 32px; font-size: 16px; line-height: 32px; top: 8px; left: 8px; }
+    #speed-indicator { top: 8px; left: 48px; font-size: 10px; padding: 2px 8px; }
+    #mute-btn { width: 30px; height: 30px; font-size: 14px; top: 8px; left: 48px; line-height: 30px; }
+    #fpv-btn, #con-btn { width: 30px; height: 30px; font-size: 13px; top: 8px; }
+    #fpv-btn { right: 8px; }
+    #con-btn { right: 44px; }
+    #mobile-controls { bottom: 12px; }
+    .m-btn { width: 44px; height: 44px; font-size: 16px; }
+    .m-row { gap: 32px; }
+}
+
+@media (max-width: 768px) {
+    .overlay .menu-content { max-height: 85vh; overflow-y: auto; }
+}
     #score-display {
         font-size: 17px;
         padding: 5px 14px;

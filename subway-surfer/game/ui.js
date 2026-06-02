@@ -47,6 +47,8 @@
             SG.shopOverlay = document.createElement('div');
             SG.shopOverlay.id = 'shop-overlay';
             SG.shopOverlay.className = 'overlay';
+            SG.shopOverlay.onclick = function(e) { if (e.target === SG.shopOverlay) SG.shopOverlay.style.display = 'none'; };
+        }
         }
 
         var owned = [false, SG.state.canDoubleJump, SG.state.canJetpack, SG.state.canRoofWalk];
@@ -130,7 +132,6 @@
             SG.toggleMute();
             SG.showShop();
         };
-    };
 
     SG.updateMenuCredits = function() {
         var el = document.getElementById('menu-credits');
