@@ -17,3 +17,4 @@ Thumbs.db
 
 # Agent workspace cruft
 HEARTBEAT.md
+subway-surfer/server/data/users.json
