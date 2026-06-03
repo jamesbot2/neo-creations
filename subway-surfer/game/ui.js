@@ -101,6 +101,7 @@
         window.__neoEquip = function(idx) {
             SG.state.equippedAbility = idx;
             SG.saveShopData();
+            if (SG.accountSave) SG.accountSave();
             SG.showShop();
         };
         window.__neoBuy = function(idx) {
@@ -112,6 +113,7 @@
                 else if (idx === 3) SG.state.canRoofWalk = true;
                 SG.state.equippedAbility = idx;
                 SG.saveShopData();
+                if (SG.accountSave) SG.accountSave();
                 SG.showShop();
             }
         };

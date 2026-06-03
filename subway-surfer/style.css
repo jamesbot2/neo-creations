@@ -648,7 +648,6 @@ input[type=range]::-moz-range-thumb {
 
 @media (max-width: 768px) {
     .overlay .menu-content { max-height: 85vh; overflow-y: auto; }
-}
     #score-display {
         font-size: 17px;
         padding: 5px 14px;
@@ -689,3 +688,4 @@ input[type=range]::-moz-range-thumb {
     #speed-indicator { top: 14px; left: 54px; font-size: 10px; padding: 2px 8px; }
     #skill-indicator { top: 56px; right: 12px; font-size: 10px; padding: 2px 8px; }
     #jetpack-timer { top: 78px; right: 12px; font-size: 9px; padding: 2px 8px; }
+}

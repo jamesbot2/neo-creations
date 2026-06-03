@@ -1609,6 +1609,7 @@
         window.__neoEquip = function(idx) {
             SG.state.equippedAbility = idx;
             SG.saveShopData();
+            if (SG.accountSave) SG.accountSave();
             SG.showShop();
         };
         window.__neoBuy = function(idx) {
@@ -1620,6 +1621,7 @@
                 else if (idx === 3) SG.state.canRoofWalk = true;
                 SG.state.equippedAbility = idx;
                 SG.saveShopData();
+                if (SG.accountSave) SG.accountSave();
                 SG.showShop();
             }
         };
@@ -3777,12 +3779,31 @@
         // Volume is already saved in localStorage by oninput handler
     };
 
+    // Sanitize user input for safe HTML rendering
+    SG.escapeHtml = function(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    };
+
     SG.loadAccountData = function(callback) {
         if (!SG.account.loggedIn || !SG.account.token) { if (callback) callback(); return; }
-        fetch('http://' + window.location.hostname + ':3000/api/load', {
+        var url = 'http://' + (window.location.hostname || '35.212.200.85') + ':3000/api/load';
+        fetch(url, {
             headers: { 'Authorization': 'Bearer ' + SG.account.token }
-        }).then(function(r) { return r.json(); }).then(function(data) {
-            if (!data.gameData) { if (callback) callback(); return; }
+        }).then(function(r) {
+            if (r.status === 401) {
+                // Token expired/invalid - force re-login
+                SG.account.token = null;
+                SG.account.loggedIn = false;
+                localStorage.removeItem('subwayToken');
+                localStorage.removeItem('subwayEmail');
+                if (SG.menuOverlay) SG.menuOverlay.style.display = 'none';
+                SG.showLogin(true);
+                if (callback) callback();
+                return null;
+            }
+            return r.json();
+        }).then(function(data) {
+            if (!data || !data.gameData) { if (callback) callback(); return; }
             var g = data.gameData;
             SG.state.bestScore = Math.max(SG.state.bestScore || 0, g.maxDistance || 0);
             SG.state.credits = g.credits || 0;
@@ -3799,6 +3820,8 @@
             SG.state.canDoubleJump = owned.indexOf(1) >= 0;
             SG.state.canJetpack = owned.indexOf(2) >= 0;
             SG.state.canRoofWalk = owned.indexOf(3) >= 0;
+            // Update menu credits after loading
+            if (SG.updateMenuCredits) SG.updateMenuCredits();
             if (callback) callback();
         }).catch(function(){ if (callback) callback(); });
     };
@@ -3842,9 +3865,9 @@
         var html = '<div class="menu-content" style="max-width:380px;text-align:left;">';
         html += '<h1 class="menu-title" style="font-size:24px;text-align:center;margin-bottom:10px;">👤 PROFILE</h1>';
         html += '<div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:15px;margin-bottom:10px;">';
-        html += '<div style="margin:4px 0;"><b style="color:#aaa;">Name:</b> ' + (SG.account.username || '-') + '</div>';
+        html += '<div style="margin:4px 0;"><b style="color:#aaa;">Name:</b> ' + SG.escapeHtml(SG.account.username || '-') + '</div>';
         html += '<div style="margin:4px 0;"><b style="color:#aaa;">Credits:</b> <span style="color:#FFD700;">' + (s.credits || 0) + '</span></div>';
-        html += '<div style="margin:4px 0;"><b style="color:#aaa;">Coins:</b> <span style="color:#FFD700;">' + (s.coins || 0) + '</span></div>';
+        html += '<div style="margin:4px 0;"><b style="color:#aaa;">Total Coins:</b> <span style="color:#FFD700;">' + (s.totalCoins || 0) + '</span></div>';
         html += '<div style="margin:4px 0;"><b style="color:#aaa;">Equipped:</b> ' + ability + '</div>';
         html += '<div style="margin:4px 0;"><b style="color:#aaa;">Owned:</b> ' + (owned.length ? owned.join(', ') : 'None') + '</div>';
         html += '<div style="margin:4px 0;"><b style="color:#aaa;">Runs:</b> ' + (s.runCount || 0) + '</div>';
@@ -3905,7 +3928,7 @@
                     var row = (i % 2 === 0) ? 'rgba(255,255,255,0.03)' : 'transparent';
                     html += '<tr style="background:' + row + ';">' +
                         '<td style="padding:3px 4px;color:#888;">' + (i+1) + '</td>' +
-                        '<td style="padding:3px 4px;">' + (e.name || 'Player') + '</td>' +
+                        '<td style="padding:3px 4px;">' + SG.escapeHtml(e.name || 'Player') + '</td>' +
                         '<td style="padding:3px 4px;color:#4CAF50;">' + (e.maxEasy||0) + 'm <span style="color:#666;font-size:10px;">[' + (abNames[e.maxEasyAbility]||'-') + ']</span></td>' +
                         '<td style="padding:3px 4px;color:#FFC107;">' + (e.maxMedium||0) + 'm <span style="color:#666;font-size:10px;">[' + (abNames[e.maxMediumAbility]||'-') + ']</span></td>' +
                         '<td style="padding:3px 4px;color:#F44336;">' + (e.maxHard||0) + 'm <span style="color:#666;font-size:10px;">[' + (abNames[e.maxHardAbility]||'-') + ']</span></td>' +
@@ -3937,10 +3960,7 @@
             return;
         } // Run original init FIRST
 
-        // Load account data from server
-        SG.loadAccountData();
-
-        // Wrap setupUI to handle login state
+        // Wrap setupUI to handle login state FIRST
         var origSetup = SG.setupUI;
         SG.setupUI = function() {
             if (origSetup) origSetup();
@@ -3949,6 +3969,9 @@
                 setTimeout(function() { SG.showLogin(true); }, 100);
             }
         };
+
+        // Load account data from server (will clear token if 401)
+        SG.loadAccountData();
 
         // Wrap startGameFromMenu to track runs
         var origStart = SG.startGameFromMenu;
