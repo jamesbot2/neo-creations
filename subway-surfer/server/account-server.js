@@ -14,6 +14,50 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 var verifyCodes = {};
 var captchaStore = {};
 
+// Rate limiter: track requests per IP+endpoint
+var rateLimitStore = {};
+var RATE_LIMITS = {
+    '/api/register': { max: 5, window: 60 },      // 5 per minute
+    '/api/captcha': { max: 15, window: 60 },        // 15 per minute
+    '/api/login': { max: 10, window: 60 },           // 10 per minute
+    '/api/verify-code': { max: 5, window: 60 },      // 5 per minute
+    '/api/save': { max: 30, window: 60 },            // 30 per minute
+    '/api/load': { max: 30, window: 60 }             // 30 per minute
+};
+var RATE_LIMIT_IGNORE = ['/api/admin-', '/admin', '/verify-codes']; // Auth-protected paths
+
+function getIP(req) {
+    return req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+}
+
+function checkRateLimit(req, pathname) {
+    // Skip rate limiter for admin paths (they have their own auth)
+    for (var ai = 0; ai < RATE_LIMIT_IGNORE.length; ai++) {
+        if (pathname.indexOf(RATE_LIMIT_IGNORE[ai]) === 0) return true;
+    }
+    var limit = RATE_LIMITS[pathname];
+    if (!limit) return true; // No limit for unknown paths
+    var ip = getIP(req);
+    var key = ip + ':' + pathname;
+    var now = Date.now();
+    var entry = rateLimitStore[key];
+    if (!entry || now - entry.start > limit.window * 1000) {
+        rateLimitStore[key] = { start: now, count: 1 };
+        return true;
+    }
+    entry.count++;
+    if (entry.count > limit.max) return false;
+    return true;
+}
+
+// Cleanup old rate limit entries every 5 minutes
+setInterval(function() {
+    var now = Date.now();
+    for (var k in rateLimitStore) {
+        if (now - rateLimitStore[k].start > 300000) delete rateLimitStore[k];
+    }
+}, 300000);
+
 function readDB(file) {
     try { if (!fs.existsSync(file)) return {}; return JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) { return {}; }
 }
@@ -48,7 +92,7 @@ function validateEmail(email) {
 }
 
 function sendJSON(res, status, data) {
-    res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' });
+    res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' });
     res.end(JSON.stringify(data));
 }
 
@@ -59,9 +103,17 @@ function sendHTML(res, html) {
 
 function parseBody(req) {
     return new Promise((resolve) => {
+        const MAX_BODY = 10240; // 10KB
         let body = '';
-        req.on('data', chunk => body += chunk);
-        req.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { resolve({}); } });
+        let exceeded = false;
+        req.on('data', chunk => {
+            body += chunk;
+            if (body.length > MAX_BODY) { exceeded = true; req.destroy(); }
+        });
+        req.on('end', () => {
+            if (exceeded) { resolve({ _error: 'Body too large' }); return; }
+            try { resolve(JSON.parse(body)); } catch(e) { resolve({}); }
+        });
     });
 }
 
@@ -153,6 +205,13 @@ async function handleRequest(req, res) {
     const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = parsedUrl.pathname;
     const method = req.method;
+
+    // Rate limiting
+    if (!checkRateLimit(req, pathname)) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+        res.end(JSON.stringify({ error: 'Too many requests. Slow down.' }));
+        return;
+    }
 
     if (method === 'OPTIONS') { sendJSON(res, 200, {}); return; }
 
