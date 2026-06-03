@@ -160,10 +160,9 @@ function doRegister() {
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.error) { msg('reg-msg', data.error, 'error'); loadCaptcha(); return; }
     document.getElementById('verify-email').textContent = email;
-    if (data.code) document.getElementById('code').value = data.code;
     document.getElementById('register-form').className = 'hidden';
     document.getElementById('verify-form').className = '';
-    msg('verify-msg', 'Code: ' + (data.code || 'check console'), 'info');
+    msg('verify-msg', '📧 Verification code sent to ' + email + '. Check your inbox!', 'success');
   }).catch(function() { msg('reg-msg', 'Server error', 'error'); });
 }
 

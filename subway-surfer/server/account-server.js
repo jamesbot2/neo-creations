@@ -32,8 +32,20 @@ function verifyPassword(password, storedHash, salt) {
 }
 
 function generateToken() { return crypto.randomBytes(32).toString('hex'); }
-function generateCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
-function validateEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+function generateCode() { return String(Math.floor(100000 + crypto.randomInt(900000))); }
+function validateEmail(email) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
+    // Reject phone numbers as email usernames
+    if (/^\d{6,}@/.test(email)) return false;
+    // Reject obviously fake domains
+    if (/@(test|example|fake|temp|dispostable|mailinator|guerrillamail|yopmail|10minute|trashmail|sharklasers|spam)\./i.test(email)) return false;
+    // Require valid TLD (2+ chars)
+    var domain = email.split('@')[1];
+    if (!domain || domain.split('.').length < 2) return false;
+    var tld = domain.split('.').pop();
+    if (!tld || tld.length < 2) return false;
+    return true;
+}
 
 function sendJSON(res, status, data) {
     res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' });
@@ -64,6 +76,15 @@ function getAuthUser(headers) {
         }
     }
     return null;
+}
+
+const ADMIN_USER = 'admin', ADMIN_PASS = 'admin123';
+function checkAdminAuth(headers) {
+    const auth = headers['authorization'] || '';
+    const [scheme, encoded] = auth.split(' ');
+    if (scheme !== 'Basic' || !encoded) return false;
+    const [user, pass] = Buffer.from(encoded, 'base64').toString().split(':');
+    return user === ADMIN_USER && pass === ADMIN_PASS;
 }
 
 function serveStatic(res, filePath, contentType) {
@@ -97,38 +118,34 @@ function defaultGameData() {
 
 function sendEmail(to, subject, body) {
     return new Promise(function(resolve) {
+        const smtpUser = process.env.SMTP_USER || 'james_sever@163.com';
+        const smtpPass = process.env.SMTP_PASS || 'DRPZ9GyPXE5H6kMT';
         try {
-            const net = require('net');
-            const client = new net.Socket();
-            let response = '';
-            let step = 0;
-            const lines = [
-                'HELO subway.local\r\n',
-                'MAIL FROM:<noreply@subwaysurfer.neo>\r\n',
-                'RCPT TO:<' + to + '>\r\n',
-                'DATA\r\n',
-                'From: "Subway Surfer" <noreply@subwaysurfer.neo>\r\n' +
-                'To: ' + to + '\r\n' +
-                'Subject: ' + subject + '\r\n' +
-                'Content-Type: text/plain; charset=utf-8\r\n' +
-                '\r\n' +
-                body + '\r\n.\r\n',
-                'QUIT\r\n'
-            ];
-            client.connect(25, '127.0.0.1', function() {});
-            client.on('data', function(data) {
-                response += data.toString();
-                if (response.includes('220') || response.includes('250') || response.includes('354') || response.includes('221')) {
-                    if (step < lines.length) {
-                        client.write(lines[step]);
-                        step++;
-                    }
+            const nodemailer = require('nodemailer');
+            const transporter = nodemailer.createTransport({
+                host: 'smtp.163.com',
+                port: 465,
+                secure: true,
+                auth: { user: smtpUser, pass: smtpPass }
+            });
+            transporter.sendMail({
+                from: '"Subway Surfer" <' + smtpUser + '>',
+                to: to,
+                subject: subject,
+                text: body
+            }, function(err, info) {
+                if (err) {
+                    console.log('[EMAIL FAIL] ' + to + ': ' + err.message);
+                    resolve(false);
+                } else {
+                    console.log('[EMAIL SENT] ' + to + ' (id: ' + info.messageId + ')');
+                    resolve(true);
                 }
             });
-            client.on('end', function() { resolve(true); });
-            client.on('error', function() { resolve(false); });
-            setTimeout(function() { client.destroy(); resolve(false); }, 5000);
-        } catch(e) { resolve(false); }
+        } catch(e) {
+            console.log('[EMAIL EXCEPTION] ' + e.message);
+            resolve(false);
+        }
     });
 }
 
@@ -159,6 +176,12 @@ async function handleRequest(req, res) {
 
     // ---- ADMIN PANEL ----
     if (pathname === '/admin' && method === 'GET') {
+        // Basic auth
+        if (!checkAdminAuth(req.headers)) {
+            res.writeHead(401, { 'Content-Type': 'text/html', 'WWW-Authenticate': 'Basic realm="Subway Admin"' });
+            res.end('<h1>401 Unauthorized</h1><p>Admin access requires login.</p>');
+            return;
+        }
         const users = getUsers();
         let h = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Admin</title>';
         h += '<style>';
@@ -202,8 +225,9 @@ async function handleRequest(req, res) {
         h += '</table></div><script>';
         h += '(function(){';
         h += 'var msg=document.getElementById("msg");';
+        h += 'var AUTH="Basic ' + Buffer.from('admin:admin123').toString('base64') + '";';
         h += 'function msgOk(t){msg.textContent=t;setTimeout(function(){location.reload()},500)};';
-        h += 'function apiPost(url,body){return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()})};';
+        h += 'function apiPost(url,body){return fetch(url,{method:"POST",headers:{"Content-Type":"application/json",Authorization:AUTH},body:JSON.stringify(body)}).then(function(r){return r.json()})};';
         // Set Coins
         h += 'document.querySelectorAll(".set-coin-btn").forEach(function(b){';
         h += 'b.addEventListener("click",function(){';
@@ -255,6 +279,7 @@ async function handleRequest(req, res) {
 
     // ---- ADMIN: DELETE USER ----
     if (pathname === '/api/admin-delete-user' && method === 'POST') {
+        if (!checkAdminAuth(req.headers)) { sendJSON(res, 401, { error: 'Admin auth required' }); return; }
         const body = await parseBody(req);
         const { email } = body;
         if (!email) { sendJSON(res, 400, { error: 'Email required' }); return; }
@@ -269,6 +294,7 @@ async function handleRequest(req, res) {
 
     // ---- ADMIN: RESET PASSWORD ----
     if (pathname === '/api/admin-reset-password' && method === 'POST') {
+        if (!checkAdminAuth(req.headers)) { sendJSON(res, 401, { error: 'Admin auth required' }); return; }
         const body = await parseBody(req);
         const { email, newPassword } = body;
         if (!email || !newPassword) { sendJSON(res, 400, { error: 'Email and new password required' }); return; }
@@ -287,6 +313,11 @@ async function handleRequest(req, res) {
 
     // ---- SHOW VERIFY CODES ----
     if (pathname === '/verify-codes' && method === 'GET') {
+        if (!checkAdminAuth(req.headers)) {
+            res.writeHead(401, { 'Content-Type': 'text/html', 'WWW-Authenticate': 'Basic realm="Subway Admin"' });
+            res.end('<h1>401</h1>');
+            return;
+        }
         let html = '<h2>Pending Verification Codes</h2><table><tr><th>Email</th><th>Code</th><th>Expires</th></tr>';
         for (const email in verifyCodes) {
             const c = verifyCodes[email];
@@ -300,23 +331,38 @@ async function handleRequest(req, res) {
     // ---- CAPTCHA IMAGE ----
     if (pathname === '/api/captcha' && method === 'GET') {
         const captchaId = crypto.randomBytes(8).toString('hex');
-        const code = Math.floor(10000 + Math.random() * 90000).toString();
+        // Generate random code with mixed digits (harder to OCR)
+        var code = '';
+        var chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+        for (var i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
         captchaStore[captchaId] = { code, expires: Date.now() + 5 * 60 * 1000 };
 
-        const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60">' +
-          '<rect width="200" height="60" fill="#2a2a4a" rx="8"/>' +
-          code.split('').map(function(ch, i) {
-            var x = 20 + i * 35;
-            var y = 32 + Math.sin(i * 1.3) * 6;
-            var rot = (Math.random() - 0.5) * 25;
-            return '<text x="' + x + '" y="' + y + '" transform="rotate(' + rot + ',' + x + ',' + y + ')" ' +
-              'font-size="28" font-weight="bold" fill="#ff6600" font-family="Arial" ' +
-              'stroke="#ffaa00" stroke-width="1">' + ch + '</text>';
+        // SVG with anti-bot features: rotated chars, noise lines, dots, gradients
+        var colors = ['#ff6600','#ff8800','#ffaa00','#ff4400','#ff7700'];
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60">' +
+          '<defs><filter id="blur"><feGaussianBlur stdDeviation="0.4"/></filter></defs>' +
+          '<rect width="200" height="60" fill="#1a1a2e" rx="8"/>' +
+          // Background noise
+          Array.from({length: 30}, function() {
+            return '<circle cx="' + Math.random()*200 + '" cy="' + Math.random()*60 +
+              '" r="' + (1+Math.random()*2) + '" fill="rgba(255,255,255,' + (0.05+Math.random()*0.1) + ')"/>';
           }).join('') +
-          Array.from({length: 4}, function() {
+          // Distorted characters
+          code.split('').map(function(ch, i) {
+            var x = 18 + i * 37 + (Math.random() - 0.5) * 8;
+            var y = 34 + Math.sin(i * 1.7) * 8 + (Math.random() - 0.5) * 4;
+            var rot = (Math.random() - 0.5) * 35;
+            var color = colors[Math.floor(Math.random() * colors.length)];
+            var size = 26 + Math.floor(Math.random() * 6);
+            return '<text x="' + x + '" y="' + y + '" transform="rotate(' + rot + ',' + x + ',' + y + ')" ' +
+              'font-size="' + size + '" font-weight="bold" fill="' + color + '" font-family="Arial" ' +
+              'filter="url(#blur)">' + ch + '</text>';
+          }).join('') +
+          // Interference lines
+          Array.from({length: 5}, function() {
             return '<line x1="' + Math.random()*200 + '" y1="' + Math.random()*60 + '" ' +
               'x2="' + Math.random()*200 + '" y2="' + Math.random()*60 + '" ' +
-              'stroke="rgba(255,255,255,0.12)" stroke-width="1"/>';
+              'stroke="rgba(255,255,255,0.15)" stroke-width="' + (1+Math.random()*2) + '"/>';
           }).join('') +
           '</svg>';
 
@@ -341,7 +387,7 @@ async function handleRequest(req, res) {
 
         // Verify captcha
         const captcha = captchaStore[captchaId];
-        if (!captcha || captcha.code !== captchaAnswer) {
+        if (!captcha || captcha.code.toLowerCase() !== captchaAnswer.toLowerCase()) {
             sendJSON(res, 400, { error: 'Incorrect captcha. Try again.' });
             return;
         }
@@ -384,7 +430,7 @@ async function handleRequest(req, res) {
             console.log('[EMAIL FAILED] ' + e.message);
         }
 
-        sendJSON(res, 201, { message: 'Verification code: ' + code, email, code: code });
+        sendJSON(res, 201, { message: 'Verification code sent to ' + email + '. Check your inbox.' });
         return;
     }
 
@@ -496,6 +542,7 @@ async function handleRequest(req, res) {
 
     // ---- ADMIN: SET COINS ----
     if (pathname === '/api/admin-set-coins' && method === 'POST') {
+        if (!checkAdminAuth(req.headers)) { sendJSON(res, 401, { error: 'Admin auth required' }); return; }
         const body = await parseBody(req);
         const { email, coins } = body;
         if (!email || coins === undefined) { sendJSON(res, 400, { error: 'Email and coins required' }); return; }
@@ -513,6 +560,7 @@ async function handleRequest(req, res) {
 
     // ---- ADMIN: SET CREDITS ----
     if (pathname === '/api/admin-set-credits' && method === 'POST') {
+        if (!checkAdminAuth(req.headers)) { sendJSON(res, 401, { error: 'Admin auth required' }); return; }
         const body = await parseBody(req);
         const { email, credits } = body;
         if (!email || credits === undefined) { sendJSON(res, 400, { error: 'Email and credits required' }); return; }
@@ -529,6 +577,7 @@ async function handleRequest(req, res) {
 
     // ---- ADMIN: VERIFY USER ----
     if (pathname === '/api/admin-verify-user' && method === 'POST') {
+        if (!checkAdminAuth(req.headers)) { sendJSON(res, 401, { error: 'Admin auth required' }); return; }
         const body = await parseBody(req);
         const { email } = body;
         if (!email) { sendJSON(res, 400, { error: 'Email required' }); return; }
