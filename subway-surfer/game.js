@@ -1620,16 +1620,20 @@
 
         SG.shopOverlay.innerHTML = html;
 
-        // Clone to clear old event listeners (only if already in DOM)
-        if (SG.shopOverlay.parentNode) {
-            var oldOverlay = SG.shopOverlay;
-            var newOverlay = oldOverlay.cloneNode(true);
-            oldOverlay.parentNode.replaceChild(newOverlay, oldOverlay);
-            SG.shopOverlay = newOverlay;
-        }
+        // Re-bind handlers (innerHTML replacement clears old listeners)
+        SG._bindShopEvents();
 
-        // Event delegation: single click handler for all shop buttons
-        SG.shopOverlay.addEventListener('click', function(e) {
+        document.body.appendChild(SG.shopOverlay);
+        SG.shopOverlay.style.display = 'flex';
+
+    };  // end showShop
+
+    SG._bindShopEvents = function() {
+        var ov = SG.shopOverlay;
+        if (!ov) return;
+
+        function shopAction(e) {
+            e.stopPropagation();
             var btn = e.target.closest('[data-shop-action]');
             if (!btn) return;
             var action = btn.getAttribute('data-shop-action');
@@ -1639,9 +1643,9 @@
                 SG.saveShopData();
                 SG.showShop();
             } else if (action === 'buy') {
-                var prices2 = [0, 10000, 50000, 100000];
-                if (SG.state.credits >= prices2[idx]) {
-                    SG.state.credits -= prices2[idx];
+                var p = [0, 10000, 50000, 100000];
+                if (SG.state.credits >= p[idx]) {
+                    SG.state.credits -= p[idx];
                     if (idx === 1) SG.state.canDoubleJump = true;
                     else if (idx === 2) SG.state.canJetpack = true;
                     else if (idx === 3) SG.state.canRoofWalk = true;
@@ -1650,20 +1654,20 @@
                     SG.showShop();
                 }
             } else if (action === 'close') {
-                SG.shopOverlay.style.display = 'none';
+                ov.style.display = 'none';
                 SG.updateMenuCredits();
             }
-        });
+        }
 
-        // Close on background click
-        SG.shopOverlay.addEventListener('click', function(e) {
-            if (e.target === SG.shopOverlay) SG.shopOverlay.style.display = 'none';
-        });
+        function bgClose(e) {
+            if (e.target === ov) { ov.style.display = 'none'; SG.updateMenuCredits(); }
+        }
 
-        document.body.appendChild(SG.shopOverlay);
-        SG.shopOverlay.style.display = 'flex';
-
-    };  // end showShop
+        ov.addEventListener('click', shopAction);
+        ov.addEventListener('touchend', shopAction);
+        ov.addEventListener('click', bgClose);
+        ov.addEventListener('touchend', bgClose);
+    };
 
     SG.updateMenuCredits = function() {
         var el = document.getElementById('menu-credits');
@@ -1710,60 +1714,60 @@
         html += '<div class="menu-btn" id="settings-close" style="margin-top:15px;">CLOSE</div>';
         html += '</div>';
 
-        // Clone to clear old listeners
-        if (SG.settingsOverlay.parentNode) {
-            var oldO = SG.settingsOverlay;
-            var newO = oldO.cloneNode(true);
-            oldO.parentNode.replaceChild(newO, oldO);
-            SG.settingsOverlay = newO;
-        }
-
         SG.settingsOverlay.innerHTML = html;
         document.body.appendChild(SG.settingsOverlay);
         SG.settingsOverlay.style.display = 'flex';
 
-        // Bind event listeners
+        SG._bindSettingsEvents();
+    };
+
+    SG._bindSettingsEvents = function() {
+        var ov = SG.settingsOverlay;
+        if (!ov) return;
+
         var muteBtn = document.getElementById('settings-mute-btn');
         if (muteBtn) {
-            muteBtn.addEventListener('click', function() {
-                SG.toggleMute();
-                SG.showSettings();
-            });
+            muteBtn.addEventListener('click', function() { SG.toggleMute(); SG.showSettings(); });
+            muteBtn.addEventListener('touchend', function(e) { e.preventDefault(); SG.toggleMute(); SG.showSettings(); });
         }
 
         var musicSlider = document.getElementById('settings-music-slider');
         var musicVal = document.getElementById('settings-music-val');
         if (musicSlider && musicVal) {
-            musicSlider.addEventListener('input', function() {
-                var val = parseFloat(this.value);
+            function onMusicInput() {
+                var val = parseFloat(musicSlider.value);
                 musicVal.textContent = Math.round(val * 100) + '%';
                 SG.state.musicVolume = val;
                 localStorage.setItem('subwayMusicVol', String(val));
-            });
+            }
+            musicSlider.addEventListener('input', onMusicInput);
+            musicSlider.addEventListener('touchend', function() { onMusicInput(); });
         }
 
         var sfxSlider = document.getElementById('settings-sfx-slider');
         var sfxVal = document.getElementById('settings-sfx-val');
         if (sfxSlider && sfxVal) {
-            sfxSlider.addEventListener('input', function() {
-                var val = parseFloat(this.value);
+            function onSfxInput() {
+                var val = parseFloat(sfxSlider.value);
                 sfxVal.textContent = Math.round(val * 100) + '%';
                 SG.state.sfxVolume = val;
                 localStorage.setItem('subwaySfxVol', String(val));
-            });
+            }
+            sfxSlider.addEventListener('input', onSfxInput);
+            sfxSlider.addEventListener('touchend', function() { onSfxInput(); });
         }
 
         var closeBtn = document.getElementById('settings-close');
         if (closeBtn) {
-            closeBtn.addEventListener('click', function() {
-                SG.settingsOverlay.style.display = 'none';
-            });
+            closeBtn.addEventListener('click', function(e) { e.stopPropagation(); ov.style.display = 'none'; });
+            closeBtn.addEventListener('touchend', function(e) { e.stopPropagation(); e.preventDefault(); ov.style.display = 'none'; });
         }
 
-        // Close on background click
-        SG.settingsOverlay.addEventListener('click', function(e) {
-            if (e.target === SG.settingsOverlay) SG.settingsOverlay.style.display = 'none';
-        });
+        function bgClose(e) {
+            if (e.target === ov) ov.style.display = 'none';
+        }
+        ov.addEventListener('click', bgClose);
+        ov.addEventListener('touchend', bgClose);
     };
 
     // ===== UI SETUP =====
@@ -2015,6 +2019,8 @@
 
         SG.menuOverlay.addEventListener('click', function(e) { if (e.target.closest('.tap-to-start')) SG.startGameFromMenu(); });
         SG.menuOverlay.addEventListener('touchend', function(e) {
+            // Only prevent default if menu is actually visible
+            if (SG.menuOverlay.style.display === 'none') return;
             e.preventDefault();
             if (e.target.closest('.tap-to-start')) SG.startGameFromMenu();
         });
@@ -3958,16 +3964,20 @@
         overlay.innerHTML = html;
         document.body.appendChild(overlay);
 
-        // CLOSE button event listener
+        // CLOSE button (click + touchend for mobile)
         var pfClose = document.getElementById('pf-close');
         if (pfClose) {
-            pfClose.addEventListener('click', function() { overlay.style.display = 'none'; });
+            pfClose.addEventListener('click', function(e) { e.stopPropagation(); overlay.style.display = 'none'; });
+            pfClose.addEventListener('touchend', function(e) { e.stopPropagation(); e.preventDefault(); overlay.style.display = 'none'; });
         }
 
-        // Close on background click
+        // Close on background click/tap
         overlay.onclick = function(e) {
             if (e.target === overlay) overlay.style.display = 'none';
         };
+        overlay.addEventListener('touchend', function(e) {
+            if (e.target === overlay) overlay.style.display = 'none';
+        });
         } catch(err) {
             console.error('[Profile] Render error:', err);
         }
