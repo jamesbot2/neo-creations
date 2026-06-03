@@ -335,7 +335,7 @@ async function handleRequest(req, res) {
         var code = '';
         var chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
         for (var i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
-        captchaStore[captchaId] = { code, expires: Date.now() + 5 * 60 * 1000 };
+        captchaStore[captchaId] = { code, expires: Date.now() + 3 * 60 * 1000 }; // 3 min
 
         // SVG with anti-bot features: rotated chars, noise lines, dots, gradients
         var colors = ['#ff6600','#ff8800','#ffaa00','#ff4400','#ff7700'];

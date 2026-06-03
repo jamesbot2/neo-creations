@@ -62,6 +62,7 @@ input:focus{border-color:#ff6600}
     <input id="reg-email" type="email" placeholder="Email">
     <input id="reg-pass" type="password" placeholder="Password (6+ chars)">
     <div id="captcha-img"></div>
+    <div style="text-align:center;margin-bottom:6px"><button id="captcha-refresh" onclick="loadCaptcha()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:#aaa;cursor:pointer;font-size:12px;border-radius:4px;padding:3px 10px" title="Refresh">🔄 Refresh</button></div>
     <input id="captcha" type="text" maxlength="5" placeholder="Enter code from image" style="text-align:center;letter-spacing:4px">
     <div id="reg-msg" class="msg"></div>
     <button class="btn btn-secondary" onclick="doRegister()">REGISTER</button>
@@ -113,6 +114,10 @@ function loadCaptcha() {
     captchaId = d.captchaId;
     document.getElementById('captcha-img').innerHTML = d.svg;
     document.getElementById('captcha').value = '';
+    // Auto-refresh every 3 minutes
+    clearTimeout(window._captchaTimer);
+    window._captchaTimer = setTimeout(loadCaptcha, 180000);
+  });
   }).catch(function() {});
 }
 
