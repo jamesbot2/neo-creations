@@ -3142,6 +3142,20 @@
             if (el) el.style.display = 'none';
         });
 
+        // Force ability visuals to be correct after returning to menu
+        SG.state.firstPerson = false;
+        if (SG.player) {
+            SG.player.visible = true;
+            if (SG.jetpackPack && SG.jetpackPack.parent !== SG.player) {
+                SG.player.add(SG.jetpackPack);
+            }
+            [SG.shoesLeft, SG.shoesRight, SG.shoesDJLeft, SG.shoesDJRight,
+             SG.shoesRWLeft, SG.shoesRWRight].forEach(function(s) {
+                if (s && s.parent !== SG.player) SG.player.add(s);
+            });
+        }
+        SG.updateAbilityVisuals();
+
         SG.spawnInitialTrack();
         SG.spawnBuildings();
         SG.spawnObstacles();
@@ -3206,6 +3220,22 @@
         if (SG.state.theme !== 0) {
             SG.switchTheme(0);
         }
+
+        // Force ability visuals to be correct after returning to menu
+        SG.state.firstPerson = false;
+        if (SG.player) {
+            SG.player.visible = true;
+            // Re-ensure jetpack pack and shoes are children of player
+            // (in case any dispose logic detached them)
+            if (SG.jetpackPack && SG.jetpackPack.parent !== SG.player) {
+                SG.player.add(SG.jetpackPack);
+            }
+            [SG.shoesLeft, SG.shoesRight, SG.shoesDJLeft, SG.shoesDJRight,
+             SG.shoesRWLeft, SG.shoesRWRight].forEach(function(s) {
+                if (s && s.parent !== SG.player) SG.player.add(s);
+            });
+        }
+        SG.updateAbilityVisuals();
 
         SG.spawnInitialTrack();
         SG.spawnBuildings();
@@ -3298,7 +3328,14 @@
 
         // Jetpack pack: show only when equipped and canJetpack
         var showJetpack = (ab === 2 && SG.state.canJetpack);
-        if (SG.jetpackPack) SG.jetpackPack.visible = showJetpack;
+        if (SG.jetpackPack) {
+            SG.jetpackPack.visible = showJetpack;
+            // Debug check: console verify
+            if (!SG.jetpackPack.parent) {
+                console.warn('Jetpack pack detached from player! Re-adding.');
+                if (SG.player) SG.player.add(SG.jetpackPack);
+            }
+        }
     };
 
     // ===== UPDATE LOOP =====
