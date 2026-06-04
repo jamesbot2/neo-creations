@@ -520,6 +520,39 @@
         SG.playerRightLeg.position.set(0.15, 0.2, 0);
         SG.player.add(SG.playerRightLeg);
 
+        // Shoes (for Double Jump / Roof Walk abilities, initially hidden)
+        var shoeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        SG.shoesLeft = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 0.18), shoeMat);
+        SG.shoesLeft.position.set(-0.15, 0.03, 0.04);
+        SG.shoesLeft.visible = false;
+        SG.player.add(SG.shoesLeft);
+        SG.shoesRight = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 0.18), shoeMat);
+        SG.shoesRight.position.set(0.15, 0.03, 0.04);
+        SG.shoesRight.visible = false;
+        SG.player.add(SG.shoesRight);
+
+        // Double Jump shoe overlay (blue/white sneaker look)
+        var djMat = new THREE.MeshLambertMaterial({ color: 0x3399ff });
+        SG.shoesDJLeft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.07, 0.2), djMat);
+        SG.shoesDJLeft.position.set(-0.15, 0.035, 0.04);
+        SG.shoesDJLeft.visible = false;
+        SG.player.add(SG.shoesDJLeft);
+        SG.shoesDJRight = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.07, 0.2), djMat);
+        SG.shoesDJRight.position.set(0.15, 0.035, 0.04);
+        SG.shoesDJRight.visible = false;
+        SG.player.add(SG.shoesDJRight);
+
+        // Roof Walk shoes (golden with glow)
+        var rwMat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0xffa500, emissiveIntensity: 0.5 });
+        SG.shoesRWLeft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.22), rwMat);
+        SG.shoesRWLeft.position.set(-0.15, 0.04, 0.04);
+        SG.shoesRWLeft.visible = false;
+        SG.player.add(SG.shoesRWLeft);
+        SG.shoesRWRight = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.22), rwMat);
+        SG.shoesRWRight.position.set(0.15, 0.04, 0.04);
+        SG.shoesRWRight.visible = false;
+        SG.player.add(SG.shoesRWRight);
+
         // Jetpack pack (backpack)
         SG.jetpackPack = new THREE.Group();
         var packBox = new THREE.Mesh(
@@ -3451,7 +3484,6 @@
             if (jetpackActive) {
                 SG.jetpackFlame.visible = true;
                 SG.jetpackFlameInner.visible = true;
-                // Flicker the flame
                 var flicker = 0.8 + Math.random() * 0.4;
                 SG.jetpackFlame.scale.set(flicker, flicker, flicker);
                 SG.jetpackFlame.material.opacity = 0.6 + Math.random() * 0.4;
@@ -3460,6 +3492,24 @@
                 SG.jetpackFlame.visible = false;
                 SG.jetpackFlameInner.visible = false;
             }
+        }
+
+        // Shoe visibility: Double Jump (ability 1) vs Roof Walk (ability 3)
+        var ab = SG.state.equippedAbility;
+        var inGame = !SG.state.gameOver && SG.state.started;
+        var showDJ = (ab === 1 && SG.state.canDoubleJump && inGame);
+        var showRW = (ab === 3 && SG.state.canRoofWalk && inGame);
+
+        if (SG.shoesLeft) SG.shoesLeft.visible = !showDJ && !showRW && inGame;
+        if (SG.shoesRight) SG.shoesRight.visible = !showDJ && !showRW && inGame;
+        if (SG.shoesDJLeft) SG.shoesDJLeft.visible = showDJ;
+        if (SG.shoesDJRight) SG.shoesDJRight.visible = showDJ;
+        if (SG.shoesRWLeft) SG.shoesRWLeft.visible = showRW;
+        if (SG.shoesRWRight) SG.shoesRWRight.visible = showRW;
+        if (showRW && SG.shoesRWLeft && SG.shoesRWRight) {
+            var pulse = 0.5 + Math.sin(Date.now() * 0.005) * 0.3;
+            SG.shoesRWLeft.material.emissiveIntensity = pulse;
+            SG.shoesRWRight.material.emissiveIntensity = pulse;
         }
 
         // Jump physics
