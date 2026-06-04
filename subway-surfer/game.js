@@ -3275,8 +3275,37 @@
         if (muteGO) muteGO.style.display = 'none';
     };
 
+    // ===== UPDATE ABILITY VISUALS (shoes + jetpack pack visibility) =====
+    SG.updateAbilityVisuals = function() {
+        var ab = SG.state.equippedAbility;
+        var showDJ = (ab === 1 && SG.state.canDoubleJump);
+        var showRW = (ab === 3 && SG.state.canRoofWalk);
+
+        // Base shoes
+        if (SG.shoesLeft) SG.shoesLeft.visible = !showDJ && !showRW;
+        if (SG.shoesRight) SG.shoesRight.visible = !showDJ && !showRW;
+        // DJ shoes
+        if (SG.shoesDJLeft) SG.shoesDJLeft.visible = showDJ;
+        if (SG.shoesDJRight) SG.shoesDJRight.visible = showDJ;
+        // RW shoes with glow
+        if (SG.shoesRWLeft) SG.shoesRWLeft.visible = showRW;
+        if (SG.shoesRWRight) SG.shoesRWRight.visible = showRW;
+        if (showRW && SG.shoesRWLeft && SG.shoesRWRight) {
+            var pulse = 0.5 + Math.sin(Date.now() * 0.005) * 0.3;
+            SG.shoesRWLeft.material.emissiveIntensity = pulse;
+            SG.shoesRWRight.material.emissiveIntensity = pulse;
+        }
+
+        // Jetpack pack: show only when equipped and canJetpack
+        var showJetpack = (ab === 2 && SG.state.canJetpack);
+        if (SG.jetpackPack) SG.jetpackPack.visible = showJetpack;
+    };
+
     // ===== UPDATE LOOP =====
     SG.update = function() {
+        // Always update ability visuals (shoes/jetpack) regardless of game state
+        SG.updateAbilityVisuals();
+
         if (SG.state.gameOver) {
             if (SG.state.cameraShake > 0) {
                 SG.state.cameraShake *= 0.95;
@@ -3492,24 +3521,6 @@
                 SG.jetpackFlame.visible = false;
                 SG.jetpackFlameInner.visible = false;
             }
-        }
-
-        // Shoe visibility: Double Jump (ability 1) vs Roof Walk (ability 3)
-        var ab = SG.state.equippedAbility;
-        var inGame = !SG.state.gameOver && SG.state.started;
-        var showDJ = (ab === 1 && SG.state.canDoubleJump && inGame);
-        var showRW = (ab === 3 && SG.state.canRoofWalk && inGame);
-
-        if (SG.shoesLeft) SG.shoesLeft.visible = !showDJ && !showRW && inGame;
-        if (SG.shoesRight) SG.shoesRight.visible = !showDJ && !showRW && inGame;
-        if (SG.shoesDJLeft) SG.shoesDJLeft.visible = showDJ;
-        if (SG.shoesDJRight) SG.shoesDJRight.visible = showDJ;
-        if (SG.shoesRWLeft) SG.shoesRWLeft.visible = showRW;
-        if (SG.shoesRWRight) SG.shoesRWRight.visible = showRW;
-        if (showRW && SG.shoesRWLeft && SG.shoesRWRight) {
-            var pulse = 0.5 + Math.sin(Date.now() * 0.005) * 0.3;
-            SG.shoesRWLeft.material.emissiveIntensity = pulse;
-            SG.shoesRWRight.material.emissiveIntensity = pulse;
         }
 
         // Jump physics
