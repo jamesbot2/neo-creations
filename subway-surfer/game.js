@@ -1555,7 +1555,8 @@
             SG.shopOverlay = document.createElement('div');
             SG.shopOverlay.id = 'shop-overlay';
             SG.shopOverlay.className = 'overlay';
-            SG.shopOverlay.onclick = function(e) { if (e.target === SG.shopOverlay) SG.shopOverlay.style.display = 'none'; };
+            SG.shopOverlay.onclick = function(e) { if (e.target === SG.shopOverlay || e.target.closest('.menu-btn')) { SG.shopOverlay.style.display = 'none'; SG.updateMenuCredits(); } };
+        SG.shopOverlay.addEventListener('touchend', function(e) { if (e.target === SG.shopOverlay || e.target.closest('.menu-btn')) { e.preventDefault(); SG.shopOverlay.style.display = 'none'; SG.updateMenuCredits(); } });
         }
         // showShop continues below...
         var prices = [0, 10000, 50000, 100000];
@@ -1644,7 +1645,8 @@
             overlay = document.createElement('div');
             overlay.id = 'settings-overlay';
             overlay.className = 'overlay';
-            overlay.onclick = function(e) { if (e.target === overlay) overlay.style.display = 'none'; };
+            overlay.onclick = function(e) { if (e.target === overlay || e.target.closest('.menu-btn')) overlay.style.display = 'none'; };
+            overlay.addEventListener('touchend', function(e) { if (e.target === overlay || e.target.closest('.menu-btn')) { e.preventDefault(); overlay.style.display = 'none'; } });
             document.body.appendChild(overlay);
         }
         var music = parseFloat(localStorage.getItem('subwayMusicVol') || '0.5');
@@ -3832,7 +3834,8 @@
             overlay = document.createElement('div');
             overlay.id = 'profile-overlay';
             overlay.className = 'overlay';
-            overlay.onclick = function(e) { if (e.target === overlay) overlay.style.display = 'none'; };
+            overlay.onclick = function(e) { if (e.target === overlay || e.target.closest('.menu-btn')) overlay.style.display = 'none'; };
+            overlay.addEventListener('touchend', function(e) { if (e.target === overlay || e.target.closest('.menu-btn')) { e.preventDefault(); overlay.style.display = 'none'; } });
             document.body.appendChild(overlay);
         }
         overlay.style.display = 'flex';
@@ -3894,7 +3897,8 @@
             overlay = document.createElement('div');
             overlay.id = 'lb-overlay';
             overlay.className = 'overlay';
-            overlay.onclick = function(e) { if (e.target === overlay) overlay.style.display = 'none'; };
+            overlay.onclick = function(e) { if (e.target === overlay || e.target.closest('.menu-btn')) overlay.style.display = 'none'; };
+            overlay.addEventListener('touchend', function(e) { if (e.target === overlay || e.target.closest('.menu-btn')) { e.preventDefault(); overlay.style.display = 'none'; } });
             document.body.appendChild(overlay);
         }
         overlay.style.display = 'flex';
