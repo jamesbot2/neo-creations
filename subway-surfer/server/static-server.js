@@ -12,13 +12,25 @@ const MIME = {
 };
 
 http.createServer((req, res) => {
-    let urlPath = decodeURIComponent(req.url.split('?')[0]);
+    let urlPath;
+    try {
+        urlPath = decodeURIComponent(req.url.split('?')[0]);
+    } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('400 Bad Request');
+        return;
+    }
     // Block path traversal: raw .., URL-encoded, or tilde
     if (urlPath.indexOf('..') !== -1 || urlPath.indexOf('~') !== -1) {
         res.writeHead(403); res.end('403 Forbidden');
         return;
     }
-    const filePath = path.join(ROOT, urlPath);
+    const filePath = path.resolve(ROOT, '.' + urlPath);
+    // Ensure filePath stays inside ROOT
+    if (filePath.indexOf(ROOT) !== 0) {
+        res.writeHead(403); res.end('403 Forbidden');
+        return;
+    }
     if (urlPath === '/') {
         // Redirect to signin page on account server (use host header for flexibility)
         var host = req.headers['host'] || 'localhost';

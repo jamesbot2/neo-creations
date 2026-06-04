@@ -47,7 +47,8 @@
             SG.shopOverlay = document.createElement('div');
             SG.shopOverlay.id = 'shop-overlay';
             SG.shopOverlay.className = 'overlay';
-            SG.shopOverlay.onclick = function(e) { if (e.target === SG.shopOverlay) SG.shopOverlay.style.display = 'none'; };
+            SG.shopOverlay.onclick = function(e) { if (e.target === SG.shopOverlay || e.target.closest('.modal-close-btn')) { SG.shopOverlay.style.display = 'none'; SG.updateMenuCredits(); } };
+            SG.shopOverlay.addEventListener('touchend', function(e) { if (e.target === SG.shopOverlay || e.target.closest('.modal-close-btn')) { e.preventDefault(); SG.shopOverlay.style.display = 'none'; SG.updateMenuCredits(); } });
         }
         // showShop continues below...
         var prices = [0, 10000, 50000, 100000];
@@ -91,7 +92,7 @@
 
         html += '<hr style="border-color:rgba(255,255,255,0.05);margin:8px 0;">';
         html += '<div style="color:#aaa;font-size:13px;margin-top:5px;">Controls: ↑ Jump | ↓ Roll | ← → Move | 👁 FPV | ` Console | M Menu</div>';
-        html += '<div class="menu-btn" onclick="__neoCloseShop()">CLOSE</div>';
+        html += '<div class="menu-btn modal-close-btn" onclick="__neoCloseShop()">CLOSE</div>';
         html += '</div>';
 
         SG.shopOverlay.innerHTML = html;
@@ -136,7 +137,8 @@
             overlay = document.createElement('div');
             overlay.id = 'settings-overlay';
             overlay.className = 'overlay';
-            overlay.onclick = function(e) { if (e.target === overlay) overlay.style.display = 'none'; };
+            overlay.onclick = function(e) { if (e.target === overlay || e.target.closest('.modal-close-btn')) overlay.style.display = 'none'; };
+            overlay.addEventListener('touchend', function(e) { if (e.target === overlay || e.target.closest('.modal-close-btn')) { e.preventDefault(); overlay.style.display = 'none'; } });
             document.body.appendChild(overlay);
         }
         var music = parseFloat(localStorage.getItem('subwayMusicVol') || '0.5');
@@ -159,7 +161,7 @@
         html += '<div style="display:flex;align-items:center;gap:8px;"><input type="range" min="0" max="1" step="0.1" value="' + sfx + '" class="__vol-slider" data-key="subwaySfxVol"><span class="vol-pct">' + Math.round(sfx * 100) + '%</span></div>';
         html += '</div>';
         html += '<div style="color:#aaa;font-size:13px;margin:12px 0;">↑ Jump | ↓ Roll | ← → Move | 👁 FPV</div>';
-        html += '<div class="menu-btn" id="__settings-close">CLOSE</div>';
+        html += '<div class="menu-btn modal-close-btn" id="__settings-close">CLOSE</div>';
         html += '</div>';
 
         overlay.innerHTML = html;

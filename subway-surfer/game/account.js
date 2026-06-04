@@ -242,7 +242,8 @@
             overlay = document.createElement('div');
             overlay.id = 'profile-overlay';
             overlay.className = 'overlay';
-            overlay.onclick = function(e) { if (e.target === overlay) overlay.style.display = 'none'; };
+            overlay.onclick = function(e) { if (e.target === overlay || e.target.closest('.modal-close-btn')) overlay.style.display = 'none'; };
+            overlay.addEventListener('touchend', function(e) { if (e.target === overlay || e.target.closest('.modal-close-btn')) { e.preventDefault(); overlay.style.display = 'none'; } });
             document.body.appendChild(overlay);
         }
         overlay.style.display = 'flex';
@@ -255,8 +256,8 @@
             } catch(e) {
                 // Fallback: render anyway even if _renderProfile fails
                 overlay.innerHTML = '<div class="menu-content"><h1 class="menu-title">👤 PROFILE</h1>' +
-                    '<div style="color:#888;padding:20px;">' + SG.account.email + '</div>' +
-                    '<div class="menu-btn" onclick="this.closest(\'.overlay\').style.display=\'none\'">CLOSE</div></div>';
+                    '<div style="color:#888;padding:20px;">' + SG.escapeHtml(SG.account.email || '') + '</div>' +
+                    '<div class="menu-btn modal-close-btn" onclick="this.closest(\'.overlay\').style.display=\'none\'">CLOSE</div></div>';
             }
         });
     };
@@ -291,7 +292,7 @@
         html += '<div style="margin:3px 0;"><span style="color:#F44336;">■</span> Hard: <b>' + (s.maxHard || 0) + 'm</b> <span style="color:#888;font-size:11px;">[' + (abNames[s.maxHardAbility] || 'None') + ']</span></div>';
         html += '</div>';
 
-        html += '<div class="menu-btn" onclick="document.getElementById(\'profile-overlay\').style.display=\'none\'" style="margin-top:12px;text-align:center;">CLOSE</div>';
+        html += '<div class="menu-btn modal-close-btn" onclick="document.getElementById(\'profile-overlay\').style.display=\'none\'" style="margin-top:12px;text-align:center;">CLOSE</div>';
         html += '</div>';
 
         overlay.innerHTML = html;
@@ -304,7 +305,8 @@
             overlay = document.createElement('div');
             overlay.id = 'lb-overlay';
             overlay.className = 'overlay';
-            overlay.onclick = function(e) { if (e.target === overlay) overlay.style.display = 'none'; };
+            overlay.onclick = function(e) { if (e.target === overlay || e.target.closest('.modal-close-btn')) overlay.style.display = 'none'; };
+            overlay.addEventListener('touchend', function(e) { if (e.target === overlay || e.target.closest('.modal-close-btn')) { e.preventDefault(); overlay.style.display = 'none'; } });
             document.body.appendChild(overlay);
         }
         overlay.style.display = 'flex';
@@ -346,12 +348,12 @@
                 }
                 html += '</table>';
             }
-            html += '<div class="menu-btn" onclick="document.getElementById(\'lb-overlay\').style.display=\'none\'" style="margin-top:12px;">CLOSE</div>';
+            html += '<div class="menu-btn modal-close-btn" onclick="document.getElementById(\'lb-overlay\').style.display=\'none\'" style="margin-top:12px;">CLOSE</div>';
             html += '</div>';
             overlay.innerHTML = html;
         })
         .catch(function() {
-            overlay.innerHTML = '<div class="menu-content"><h1 class="menu-title">🏆 LEADERBOARD</h1><div style="color:#ff4444;padding:20px;">Failed to load. Server offline?</div><div class="menu-btn" onclick="document.getElementById(\'lb-overlay\').style.display=\'none\'">CLOSE</div></div>';
+            overlay.innerHTML = '<div class="menu-content"><h1 class="menu-title">🏆 LEADERBOARD</h1><div style="color:#ff4444;padding:20px;">Failed to load. Server offline?</div><div class="menu-btn modal-close-btn" onclick="document.getElementById(\'lb-overlay\').style.display=\'none\'">CLOSE</div></div>';
         });
     };
 
@@ -363,22 +365,23 @@
     // Override init to show login first
     var origInit = SG.init;
     SG.init = function() {
-        try {
-            if (origInit) origInit();
-        } catch(e) {
-            document.body.innerHTML += '<div style="position:fixed;top:0;left:0;width:100%;background:#ff0000;color:#fff;padding:20px;z-index:9999;font-size:16px;">ERROR: ' + e.message + '<br>' + e.stack.split('\n').slice(0,3).join('<br>') + '</div>';
-            return;
-        } // Run original init FIRST
-
-        // Wrap setupUI to handle login state FIRST
+        // Wrap setupUI BEFORE calling original init, so the menu
+        // doesn't flash before login check runs
         var origSetup = SG.setupUI;
         SG.setupUI = function() {
             if (origSetup) origSetup();
             if (!SG.account.loggedIn) {
                 if (SG.menuOverlay) SG.menuOverlay.style.display = 'none';
-                setTimeout(function() { SG.showLogin(true); }, 100);
+                SG.showLogin(true);
             }
         };
+
+        try {
+            if (origInit) origInit();
+        } catch(e) {
+            document.body.innerHTML += '<div style="position:fixed;top:0;left:0;width:100%;background:#ff0000;color:#fff;padding:20px;z-index:9999;font-size:16px;">ERROR: ' + e.message + '<br>' + e.stack.split('\n').slice(0,3).join('<br>') + '</div>';
+            return;
+        }
 
         // Load account data from server (will clear token if 401)
         SG.loadAccountData();
