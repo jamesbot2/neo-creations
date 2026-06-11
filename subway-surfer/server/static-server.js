@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 8080;
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.resolve(__dirname, '..');
 const MIME = {
     '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
     '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
@@ -26,8 +26,8 @@ http.createServer((req, res) => {
         return;
     }
     const filePath = path.resolve(ROOT, '.' + urlPath);
-    // Ensure filePath stays inside ROOT
-    if (filePath.indexOf(ROOT) !== 0) {
+    // Ensure filePath stays inside ROOT (boundary check)
+    if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) {
         res.writeHead(403); res.end('403 Forbidden');
         return;
     }

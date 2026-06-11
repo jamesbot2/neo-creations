@@ -1,22 +1,25 @@
 # MEMORY.md - Long-Term Memory
 
-## GitHub Repos
+## GitHub 仓库功能说明
 
-### jamesbot2/neo-creations
+### jamesbot2/neo-creations 🏠 — 工作区仓库
 - **远程名**: `origin`
 - **URL**: `https://github.com/jamesbot2/neo-creations.git`
-- **Token**: 存在 `~/.openclaw/workspace/.github/github-token`
 - **分支**: main
-- **内容**: 整个工作区（AGENTS.md、SOUL.md、USER.md、TOOLS.md、子项目等）
-- **根目录 README**: "Things Neo made 🤖"
+- **用途**: Neo 的工作区根目录（AGENTS.md、SOUL.md、USER.md、TOOLS.md、MEMORY.md、memory/、技能、子项目等）
+- **README**: "Things Neo made 🤖"
+- **Token 位置**: 内嵌在 `~/.openclaw/workspace/.git/config` 的 remote URL 中
+- **推什么**: 日常工作、文档、记忆、学习记录、子项目开发
 
-### jamesbot2/subway-surfer
+### jamesbot2/subway-surfer 🎮 — 游戏仓库
 - **远程名**: `gh-pages`
 - **URL**: `https://github.com/jamesbot2/subway-surfer.git`
 - **分支**: main
-- **内容**: 仅 subway-surfer 游戏文件
-  - README.md / game/ / server/ / game.js / index.html / signin.html / game.html / style.css / start-servers.sh
-- **注意**: 这是单独的游戏仓库，不要推整个工作区进去
+- **用途**: 仅 subway-surfer 3D 跑酷游戏
+- **内容**: game/、server/、game.js、index.html、signin.html、style.css、start-servers.sh 等游戏文件
+- **本地路径**: `~/.openclaw/workspace/subway-surfer/`
+- **⚠️ 推时注意**: 只推游戏文件！绝不可推 AGENTS.md、SOUL.md、memory/ 等工作区文件
+- **已清理**: 2026-06-11 force push 清除了误推的整个工作区内容
 
 ## Subway Surfer 游戏
 - 3D 无限跑酷，Three.js + Node.js
@@ -57,3 +60,16 @@
 ### OpenClaw Dashboard
 - 只能通过 Tailscale 访问: http://100.112.240.25:18789
 - 仍有更新可用（2026.5.28）
+
+## Account System Template
+
+subwaysurfer 项目的登录系统（含邮箱验证、图形验证码、账号密码、云端存档、管理面板）已经拆成可复用模板。
+
+- 纯 Node.js http 单文件，无框架，~600 行
+- 自绘 SVG 验证码（无第三方库）
+- PBKDF2+SHA256 密码哈希
+- nodemailer 163 SMTP 发邮件
+- JSON 文件存储
+- 6 个 API 端点 + 1 个管理面板
+
+详细文档：`memory/account-system-template.md`
