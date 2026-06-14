@@ -123,6 +123,176 @@ subway-surfer/
 
 ---
 
+## 🆚 PVP 比赛系统 (Phase 2)
+
+多人实时对战，基于 WebSocket + 现有账号系统 token 认证。
+
+### 启动命令
+
+```bash
+cd subway-surfer
+node server/pvp-server.js
+```
+
+默认端口 **3001**，可通过 `PVP_PORT` 环境变量覆盖：
+
+```bash
+PVP_PORT=4000 node server/pvp-server.js
+```
+
+### WebSocket 地址
+
+```
+ws://<host>:3001
+```
+
+### 消息协议
+
+所有消息均为 JSON。
+
+#### 1️⃣ 认证
+
+```json
+// client → server
+{ "type": "hello", "token": "<login-token>" }
+
+// server → client (成功)
+{ "type": "helloOk", "userId": "...", "username": "...", "emailVerified": true }
+
+// server → client (失败, 随后关闭连接)
+{ "type": "error", "error": "invalid token" }
+```
+
+#### 2️⃣ 房间
+
+```json
+// 查看公开房间
+client → server: { "type": "listRooms" }
+server → client: { "type": "roomList", "rooms": [...] }
+
+// 创建房间
+client → server: { "type": "createRoom", "roomName": "Cyber Sprint" }
+server → client: { "type": "roomUpdate", "room": {...} }
+
+// 加入房间
+client → server: { "type": "joinRoom", "roomId": "..." }
+server → client: { "type": "roomUpdate", "room": {...} }  // 给自己
+server → client: { "type": "roomUpdate", "room": {...} }  // 广播给房间其他人
+
+// 离开房间
+client → server: { "type": "leaveRoom" }
+
+// 邀请（仅房主）
+client → server: { "type": "invite", "roomId": "...", "toUserId": "..." }
+server → target: { "type": "invite", "roomId": "...", "fromUserId": "...", "fromUsername": "..." }
+
+// 回应邀请
+client → server: { "type": "inviteResponse", "roomId": "...", "accept": true|false }
+
+// 准备状态
+client → server: { "type": "ready", "roomId": "...", "ready": true|false }
+```
+
+房间限制：最多 3 人、未 start 才能加入、不踢出房间。
+
+#### 3️⃣ 比赛开始
+
+```json
+// 房主发起（需全员 ready、≥2 人）
+client → server: { "type": "start", "roomId": "..." }
+
+// 广播给所有人
+server → client: {
+  "type": "matchStart",
+  "roomId": "...",
+  "seed": "<256-bit-hex>",
+  "players": [
+    { "userId": "...", "username": "...", "lane": 0, "startOffset": 0, "characterId": "runner" }
+  ]
+}
+```
+
+每位玩家得到唯一的 `lane` (0/1/2) 和 `startOffset` (0/-4/-8)。
+
+#### 4️⃣ 实时同步 (20Hz)
+
+```json
+// 客户端上报状态
+client → server: {
+  "type": "snapshot",
+  "roomId": "...",
+  "snapshot": {
+    "lane": 1,
+    "distance": 120,
+    "isJumping": false,
+    "isRolling": true,
+    "alive": true,
+    "spectating": false,
+    "characterId": "runner",
+    "timestamp": 1710000000000
+  }
+}
+
+// 服务端每 50ms 转发其他玩家状态
+server → client: {
+  "type": "snapshotBatch",
+  "roomId": "...",
+  "players": [
+    { "userId": "...", "username": "...", "snapshot": {...} }
+  ]
+}
+```
+
+死亡玩家 (`alive: false`) 继续留在房间接收 `snapshotBatch`，用于观战。
+
+#### 5️⃣ 比赛结束
+
+当所有玩家 `alive: false` 时，服务端广播：
+
+```json
+server → client: {
+  "type": "matchEnd",
+  "roomId": "...",
+  "ranking": [
+    { "userId": "...", "username": "...", "distance": 900, "rank": 1 },
+    { "userId": "...", "username": "...", "distance": 500, "rank": 2 }
+  ]
+}
+```
+
+排名按最高 distance 从高到低。结束后不再接收 `snapshot`。
+
+#### 错误格式
+
+```json
+{ "type": "error", "error": "message" }
+```
+
+### 防作弊
+
+| 检查 | 说明 |
+|------|------|
+| distance 不能倒退 | 上次距离 > 当前距离 → 拒绝 |
+| 单次增长上限 ≤50 | 20Hz 上报，约 1000 单位/秒 |
+| lane 必须 0/1/2 | 非法 lane → 拒绝 |
+| distance ≥0 | 负数 → 拒绝 |
+| 仅房间内玩家可发 snapshot | 不在房间 → 拒绝 |
+| 仅 started 后可发 | 未开始 → 拒绝 |
+| started 后不可加入 | 比赛中不再接收新人 |
+| ended 后不可发 snapshot | 结算后拒绝 |
+
+### 架构
+
+```
+server/
+├── auth.js             ← 共享 token 校验 (被 account-server + pvp-server 共用)
+├── account-server.js   ← HTTP: 注册/登录/存档/排行榜
+├── pvp-server.js       ← WebSocket: 房间/比赛/实时同步
+└── pvp-smoke.js        ← 集成测试
+```
+
+---
+
 ## 🚔 警察追踪系统
 
 跑过 200m 后，一辆警车从后方追来：
